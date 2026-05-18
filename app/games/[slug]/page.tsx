@@ -1,0 +1,47 @@
+import { notFound } from "next/navigation";
+
+import { getGameBySlug } from "../../lib/games";
+
+export default async function GameDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const game = await getGameBySlug(slug);
+  if (!game) notFound();
+
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-16 text-slate-100">
+      <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-10 shadow-2xl shadow-black/20">
+        <p className="text-sm uppercase tracking-[0.3em] text-indigo-300">Game details</p>
+        <h1 className="mt-4 text-4xl font-semibold text-white">{game.title}</h1>
+        <p className="mt-6 max-w-3xl leading-8 text-slate-300">{game.description}</p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-3xl bg-slate-950/80 p-6">
+            <p className="text-sm text-slate-400">Players</p>
+            <p className="mt-2 font-semibold text-white">{game.players}</p>
+          </div>
+          <div className="rounded-3xl bg-slate-950/80 p-6">
+            <p className="text-sm text-slate-400">Duration</p>
+            <p className="mt-2 font-semibold text-white">{game.duration}</p>
+          </div>
+          <div className="rounded-3xl bg-slate-950/80 p-6">
+            <p className="text-sm text-slate-400">Themes</p>
+            <p className="mt-2 font-semibold text-white">{game.themes.join(", ")}</p>
+          </div>
+        </div>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <a
+            href={`/host/create?game=${game.slug}`}
+            className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-400"
+          >
+            Start party
+          </a>
+          <a
+            href="/host"
+            className="rounded-full border border-white/10 px-6 py-3 text-sm font-semibold text-white hover:border-white"
+          >
+            Invite guests
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
