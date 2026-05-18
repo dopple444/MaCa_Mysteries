@@ -2,7 +2,7 @@
 
 Last inspected: 2026-05-18
 
-These are the exact next 10 development steps after the current stabilization, database-backed catalog work, and party-to-game linkage.
+These are the exact next 10 development steps after the current stabilization, database-backed catalog work, party-to-game linkage, and basic guest join flow.
 
 1. Keep Git healthy.
    - Continue committing each completed slice.
@@ -23,15 +23,16 @@ These are the exact next 10 development steps after the current stabilization, d
    - Confirm existing test parties still load.
    - Confirm the party page shows game title and version.
 
-5. Build the guest join backend flow.
-   - Look up parties by invite code.
-   - Let guests enter name/email and attach to an existing invite where possible.
-   - Track joined status.
-   - Keep this separate from character assignment.
+5. Re-test the guest join backend flow.
+   - Open `/join?code=INVITECODE`.
+   - Join with an invited guest email and confirm status changes to `JOINED`.
+   - Join with a new email and confirm a guest is created.
+   - Confirm `/play` shows the player lobby.
 
-6. Add player session or guest-token access.
-   - Decide whether guests use accountless magic links, lightweight guest sessions, or full user accounts.
-   - Ensure guests can only see their own party/player data.
+6. Tighten guest access rules.
+   - Decide whether unmatched emails should auto-join, require host approval, or be blocked.
+   - Add a host-visible distinction between invited, joined, and uninvited-code-joined guests.
+   - Add tests around guest cookie access.
 
 7. Draft character and assignment models.
    - Add `GameCharacter`, required/optional flags, and `PartyCharacterAssignment`.

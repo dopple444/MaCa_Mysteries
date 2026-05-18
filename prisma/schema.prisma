@@ -59,6 +59,7 @@ model Guest {
   email      String
   status     String   @default("INVITED")
   guestToken String   @unique
+  joinedAt   DateTime?
   createdAt  DateTime @default(now())
 }
 

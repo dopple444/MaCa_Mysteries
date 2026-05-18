@@ -52,7 +52,8 @@ Key dependency versions from `package.json`:
 | `app/login/` | Host sign-in page. |
 | `app/signup/` | Host registration page. |
 | `app/dashboard/` | Authenticated host dashboard. |
-| `app/join/` | Guest join page shell. Currently only collects or preserves a party code. |
+| `app/join/` | Guest join page. Looks up parties by invite code and creates a guest session. |
+| `app/play/` | Basic player lobby for joined guests waiting on character assignment. |
 | `prisma/` | Prisma schema for current self-hosted data model. |
 | `.next/` | Generated Next.js build/dev output. Should not be treated as source. |
 | `node_modules/` | Installed npm dependencies. Should not be treated as source. |
@@ -75,7 +76,8 @@ Key dependency versions from `package.json`:
 | --- | --- |
 | `app/games/page.tsx` | Public catalog page. Reads published games from PostgreSQL through `app/lib/games.ts`. |
 | `app/games/[slug]/page.tsx` | Public game detail page. Reads a published game by slug and uses `notFound()` when slug is unknown. |
-| `app/join/page.tsx` | Guest join shell. Reads `?code=` from search params and displays a join form, but does not currently submit to a backend action. |
+| `app/join/page.tsx` | Guest join form. Reads `?code=` from search params, submits to `joinParty()`, and shows validation errors. |
+| `app/play/page.tsx` | Basic guest-authenticated player lobby. Shows party, game, guest email, guest status, and a waiting message. |
 
 ### Auth Screens
 
@@ -107,6 +109,8 @@ Key dependency versions from `package.json`:
 | `app/lib/prisma.ts` | Creates/reuses a Prisma Client instance and stores it on `globalThis` during development. |
 | `app/lib/auth.ts` | Custom password hashing, password verification, session token creation, session clearing, current-user lookup, and auth guard. |
 | `app/lib/auth-actions.ts` | Server actions for login, signup, and logout. Uses Prisma and redirects after completion. |
+| `app/lib/guest-auth.ts` | Guest cookie/session helpers for joined player access. |
+| `app/lib/join-actions.ts` | Server action for joining a party by invite code, name, and email. |
 | `app/lib/party-actions.ts` | Server actions for creating parties and adding guests. Generates invite codes and guest tokens. |
 | `app/lib/games.ts` | Database-backed helpers for published game catalog reads and public game detail lookup. |
 
@@ -167,13 +171,17 @@ Game catalog data is now database-backed:
 
 ### Guest Joining
 
-`/join` is currently a form shell only. It reads a code from the URL, pre-fills the input, and submits as a normal GET back to the same route. It does not yet:
+`/join` now supports the first guest join flow:
 
-- Look up a party by invite code.
-- Authenticate or identify a guest.
-- Mark guests as joined.
-- Assign characters.
-- Show player cards or clues.
+1. Guest opens `/join?code=INVITECODE` or enters a party code manually.
+2. Guest enters name and email.
+3. `joinParty()` looks up the party by invite code.
+4. If the email matches an invited guest for that party, that guest is updated.
+5. If no invited guest matches, a joined guest is created using the invite code as the shared secret.
+6. Guest status is set to `JOINED`, `joinedAt` is recorded, and an HTTP-only `maca_guest` cookie is set.
+7. Guest is redirected to `/play`.
+
+It does not yet assign characters or show player cards/clues.
 
 ## Current Database Model
 
@@ -186,7 +194,7 @@ The current Prisma schema contains:
 - `GameVersion`
 - `Product`
 - `Party`
-- `Guest`
+- `Guest`, including `joinedAt`
 
 Current model coverage is useful as a scaffold, but it is far short of the target game platform. It does not yet include:
 
@@ -217,7 +225,7 @@ Gaps:
 
 - No full game content data model.
 - No payment/order ownership checks for activating games.
-- No guest join backend flow.
+- Guest join has a basic backend flow, but no character assignment or player cards yet.
 - No character assignment.
 - No round engine.
 - No spoiler-safe content access layer.

@@ -4,7 +4,7 @@ Last inspected: 2026-05-18
 
 ## Summary
 
-This app currently contains a small set of Next.js App Router screens. The routes cover public landing/catalog pages, host account auth, basic host dashboard, basic party creation, basic party guest management, and a guest join shell.
+This app currently contains a small set of Next.js App Router screens. The routes cover public landing/catalog pages, host account auth, basic host dashboard, basic party creation, basic party guest management, guest join, and a basic player lobby.
 
 No screen currently imports or calls Base44.
 
@@ -18,7 +18,8 @@ No screen currently imports or calls Base44.
 | `/host` | `app/host/page.tsx` | Host experience intro with feature cards and links to catalog/join. | Public visitor, customer, host | None found | Optional featured games, authenticated host state, host's active parties later | Medium |
 | `/host/create?game=slug` | `app/host/create/page.tsx` | Authenticated form to create a party for a selected game and add initial guest emails. | Host, customer | None found | Current user, selected game/version, purchase/activation entitlement, party defaults, invite settings | High |
 | `/host/party/[partyId]` | `app/host/party/[partyId]/page.tsx` | Authenticated host party control view showing party details, invite code, guest list, and add-guest form. | Host | None found | Party, host ownership, guests, assignments, game/version details, round state, spoiler mode, evidence reveals, invite delivery state | High |
-| `/join` | `app/join/page.tsx` | Guest join form. Preserves `?code=` but does not yet join a party. | Guest, player | None found | Party lookup by invite code, guest invite/token, join status, display name, contact info, assigned character, player session | High |
+| `/join` | `app/join/page.tsx` | Guest join form. Looks up party by code, accepts name/email, marks or creates a joined guest, and sets a guest cookie. | Guest, player | None found | Party lookup by invite code, guest invite/token, join status, display name, contact info, assigned character, player session | High |
+| `/play` | `app/play/page.tsx` | Basic guest-authenticated player lobby after joining. Shows party/game/player status and waits for character assignment. | Player | None found | Guest session, party, game/version, assignment, visible player state later | High |
 | `/login` | `app/login/page.tsx` | Host sign-in form. | Customer, host, admin later | None found | User by email, password hash, session creation, rate-limit state, account status | High |
 | `/signup` | `app/signup/page.tsx` | Host registration form. | Customer, host | None found | User creation, duplicate email check, password hash, session creation, email verification later | High |
 | `/dashboard` | `app/dashboard/page.tsx` | Authenticated host dashboard with welcome message, sign-out, and links. | Host, admin later | None found | Current user, parties, purchases/orders, upcoming events, admin role flags | High |
@@ -40,7 +41,7 @@ These screens are not present yet but are required or likely for the first compl
 | `/account/orders` | View purchases and available game activations. | Customer, host | Orders, order items, products, game entitlements | Must have before paid launch |
 | `/host/party/[partyId]/assignments` | Assign required and optional characters to guests. | Host | Party guests, game characters, assignment rules | Must have |
 | `/host/party/[partyId]/rounds` | Host round controls with spoiler-safe mode and optional unlock. | Host | Party state, round state, spoiler rules, game version | Must have |
-| `/play/[partyId]` or `/party/[partyId]/player` | Player party home and character view. | Player | Guest identity, assignment, visible cards, current round, private clues | Must have |
+| `/play/[partyId]` or expanded `/play` views | Player party home and character view. | Player | Guest identity, assignment, visible cards, current round, private clues | Must have |
 | `/play/[partyId]/round/[roundNumber]` | Player round card/clue screen. | Player | Round cards, clues, evidence, message reveals, privacy rules | Must have |
 | `/play/[partyId]/accuse` | Submit accusation or final guess. | Player | Accusation prompts, available suspects, party round state | Should have |
 | `/host/party/[partyId]/reveal` | Host final reveal control. | Host | Solution, killer/victim reveal rules, party accusations, result data | Must have |
@@ -92,7 +93,11 @@ Priority:
 
 Current state:
 
-- Join form does not perform backend lookup or joining.
+- Join form performs backend party lookup by invite code.
+- Guests can join with name/email.
+- Matching invited guests are updated; unmatched guests are created for the party.
+- A guest cookie grants access to `/play`.
+- `/play` shows a waiting lobby, not game content.
 
 Target state:
 

@@ -30,7 +30,8 @@ Clearing `.next` resolved that stale build issue. The app then compiled and serv
 | --- | --- | --- |
 | `/` | `200 OK` | Public home page renders. |
 | `/host` | `200 OK` | Public host information page renders. |
-| `/join` | `200 OK` | Guest join shell renders. Form does not yet perform backend join. |
+| `/join` | `200 OK` | Guest join form renders and submits to the join backend action. |
+| `/play` | `307 Temporary Redirect` | Redirects to `/join` without a guest cookie; renders player lobby after joining. |
 | `/games` | `200 OK` | Public database-backed catalog renders. |
 | `/games/the-last-curtain` | `200 OK` | Game detail route renders. |
 | `/games/murder-at-hollow-lake` | `200 OK` | Game detail route renders. |
@@ -51,7 +52,7 @@ Clearing `.next` resolved that stale build issue. The app then compiled and serv
 | `app/layout.tsx` | `/join` | OK | Join shell. |
 | `app/layout.tsx` | `/games` | OK | Catalog page. |
 | `app/page.tsx` | `/host` | OK | CTA says `Host dashboard`, but it actually opens public host intro page. Copy may need adjustment later. |
-| `app/page.tsx` | `/join` | OK | Public join shell. |
+| `app/page.tsx` | `/join` | OK | Public guest join form. |
 | `app/host/page.tsx` | `/games` | OK | Catalog CTA. |
 | `app/host/page.tsx` | `/join` | OK | Join CTA. |
 | `app/games/page.tsx` | `/games/the-last-curtain` | OK | Dynamic game detail route. |
