@@ -5,6 +5,9 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
 export type GameDef = {
+  id: string;
+  versionId: string;
+  versionNumber: number;
   slug: string;
   title: string;
   tagline: string;
@@ -48,6 +51,9 @@ function toGameDef(game: GameWithPublishedVersion): GameDef | null {
   if (!version) return null;
 
   return {
+    id: game.id,
+    versionId: version.id,
+    versionNumber: version.versionNumber,
     slug: game.slug,
     title: game.title,
     tagline: game.tagline,

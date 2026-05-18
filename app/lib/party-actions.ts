@@ -70,6 +70,8 @@ export async function createParty(formData: FormData) {
     data: {
       title,
       gameSlug,
+      gameId: game.id,
+      gameVersionId: game.versionId,
       hostId: user.id,
       inviteCode: generateCode(),
       guests: {

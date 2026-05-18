@@ -91,7 +91,7 @@ Key dependency versions from `package.json`:
 | --- | --- |
 | `app/host/page.tsx` | Marketing/feature shell for host experience. Does not require auth and does not read backend data. |
 | `app/host/create/page.tsx` | Authenticated party creation form. Reads selected game from `?game=slug` using `getGameBySlug()`. Submits to `createParty`. |
-| `app/host/party/[partyId]/page.tsx` | Authenticated party control screen. Reads party and guests from Prisma, verifies current user owns party, shows invite code and guests, and allows adding another guest. |
+| `app/host/party/[partyId]/page.tsx` | Authenticated party control screen. Reads party, linked game/version, and guests from Prisma, verifies current user owns party, shows invite code and guests, and allows adding another guest. |
 
 ### API Routes
 
@@ -144,6 +144,7 @@ Game catalog data is now database-backed:
 - `Game` stores public catalog identity, player counts, duration, and publish status.
 - `GameVersion` stores versioned metadata such as themes and publish status.
 - `Product` stores the first basic sales/product record for each game.
+- `Party` keeps `gameSlug` for compatibility and now also stores nullable `gameId` and `gameVersionId` links.
 - `app/lib/games.ts` maps database records into the public-safe shape used by pages and API routes.
 
 ### Party Creation
@@ -153,7 +154,7 @@ Game catalog data is now database-backed:
 3. `/host/create` requires an authenticated user.
 4. The page looks up the published game by slug from PostgreSQL.
 5. Form posts to `createParty()`.
-6. `createParty()` re-checks the current logged-in user, validates the published game, creates a `Party`, and creates optional initial `Guest` records in Prisma.
+6. `createParty()` re-checks the current logged-in user, validates the published game, creates a `Party` linked to the published game/version, and creates optional initial `Guest` records in Prisma.
 7. Host is redirected to `/host/party/[partyId]`.
 
 ### Party Management

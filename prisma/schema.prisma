@@ -35,16 +35,20 @@ model UserSession {
 }
 
 model Party {
-  id         String   @id @default(cuid())
-  title      String
-  gameSlug   String
-  hostId     String
-  host       User     @relation(fields: [hostId], references: [id])
-  inviteCode String   @unique
-  status     String   @default("PENDING")
-  guests     Guest[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String       @id @default(cuid())
+  title         String
+  gameSlug      String
+  gameId        String?
+  game          Game?        @relation(fields: [gameId], references: [id])
+  gameVersionId String?
+  gameVersion   GameVersion? @relation(fields: [gameVersionId], references: [id])
+  hostId        String
+  host          User         @relation(fields: [hostId], references: [id])
+  inviteCode    String       @unique
+  status        String       @default("PENDING")
+  guests        Guest[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 model Guest {
@@ -71,6 +75,7 @@ model Game {
   status      String        @default("DRAFT")
   versions    GameVersion[]
   products    Product[]
+  parties     Party[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -83,6 +88,7 @@ model GameVersion {
   status        String    @default("DRAFT")
   themes        Json      @default("[]")
   publishedAt   DateTime?
+  parties       Party[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -12,7 +12,11 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
   const user = await requireUser();
   const party = await prisma.party.findUnique({
     where: { id: partyId },
-    include: { guests: true }
+    include: {
+      game: true,
+      gameVersion: true,
+      guests: true
+    }
   });
 
   if (!party || party.hostId !== user.id) notFound();
@@ -28,8 +32,11 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
             <p className="mt-2 font-semibold text-white">{party.inviteCode}</p>
           </div>
           <div className="rounded-3xl bg-slate-950/80 p-6">
-            <p className="text-sm text-slate-400">Game slug</p>
-            <p className="mt-2 font-semibold text-white">{party.gameSlug}</p>
+            <p className="text-sm text-slate-400">Game</p>
+            <p className="mt-2 font-semibold text-white">{party.game?.title ?? party.gameSlug}</p>
+            <p className="mt-1 text-sm text-slate-400">
+              {party.gameVersion ? `Version ${party.gameVersion.versionNumber}` : party.gameSlug}
+            </p>
           </div>
         </div>
 
