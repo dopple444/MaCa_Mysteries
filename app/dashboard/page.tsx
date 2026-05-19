@@ -2,11 +2,13 @@ import Link from "next/link";
 
 import { requireUser } from "../lib/auth";
 import { logout } from "../lib/auth-actions";
+import { getCsrfToken } from "../lib/csrf";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const csrfToken = await getCsrfToken();
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 text-slate-100">
@@ -18,6 +20,7 @@ export default async function DashboardPage() {
             <p className="mt-3 text-slate-300">Manage parties, assign guests, and run your game in spoiler-safe mode.</p>
           </div>
           <form action={logout}>
+            <input type="hidden" name="csrfToken" value={csrfToken} />
             <button className="rounded-full border border-white/10 bg-slate-950/90 px-5 py-3 text-sm font-semibold text-white hover:border-white">
               Sign out
             </button>
@@ -32,6 +35,20 @@ export default async function DashboardPage() {
           <Link href="/games" className="rounded-3xl border border-white/10 bg-slate-950/80 p-8 hover:border-indigo-400">
             <h2 className="text-xl font-semibold text-white">Game catalog</h2>
             <p className="mt-3 text-slate-300">Browse original mysteries and choose your next party story.</p>
+          </Link>
+          <Link
+            href="/account/notifications"
+            className="rounded-3xl border border-white/10 bg-slate-950/80 p-8 hover:border-indigo-400"
+          >
+            <h2 className="text-xl font-semibold text-white">Notifications</h2>
+            <p className="mt-3 text-slate-300">Manage email and SMS preferences before providers go live.</p>
+          </Link>
+          <Link
+            href="/account/orders"
+            className="rounded-3xl border border-white/10 bg-slate-950/80 p-8 hover:border-indigo-400"
+          >
+            <h2 className="text-xl font-semibold text-white">Orders and access</h2>
+            <p className="mt-3 text-slate-300">Review purchases and launch games you can host.</p>
           </Link>
         </div>
       </div>

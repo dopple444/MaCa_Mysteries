@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Marked estate map clue</title>
+  <desc id="desc">A simple map-style clue image for Murder at Hollow Lake.</desc>
+  <rect width="960" height="540" fill="#0f172a"/>
+  <path d="M0 360c160-54 270-48 390-12 138 42 286 34 570-70v262H0z" fill="#164e63"/>
+  <rect x="186" y="118" width="220" height="148" rx="10" fill="#e2e8f0"/>
+  <rect x="238" y="172" width="64" height="94" fill="#94a3b8"/>
+  <text x="296" y="98" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#e2e8f0">Hollow Lake Estate</text>
+  <path d="M296 268 C 360 314, 438 334, 522 350 S 672 396, 760 360" fill="none" stroke="#facc15" stroke-width="8" stroke-dasharray="16 16" stroke-linecap="round"/>
+  <circle cx="760" cy="360" r="18" fill="#dc2626"/>
+  <text x="700" y="326" font-family="Arial, sans-serif" font-size="22" fill="#f8fafc">shoreline</text>
+  <text x="454" y="322" font-family="Arial, sans-serif" font-size="20" fill="#facc15">service path</text>
+</svg>

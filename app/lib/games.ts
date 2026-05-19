@@ -15,11 +15,18 @@ export type GameDef = {
   players: string;
   duration: string;
   themes: string[];
+  product: {
+    id: string;
+    name: string;
+    priceCents: number;
+    currency: string;
+  } | null;
 };
 
 type GameWithPublishedVersion = Prisma.GameGetPayload<{
   include: {
     versions: true;
+    products: true;
   };
 }>;
 
@@ -49,6 +56,7 @@ function getThemes(value: Prisma.JsonValue | undefined) {
 function toGameDef(game: GameWithPublishedVersion): GameDef | null {
   const version = game.versions[0];
   if (!version) return null;
+  const product = game.products[0];
 
   return {
     id: game.id,
@@ -60,7 +68,15 @@ function toGameDef(game: GameWithPublishedVersion): GameDef | null {
     description: game.description,
     players: formatPlayers(game.minPlayers, game.maxPlayers),
     duration: formatDuration(game.durationMin, game.durationMax),
-    themes: getThemes(version.themes)
+    themes: getThemes(version.themes),
+    product: product
+      ? {
+          id: product.id,
+          name: product.name,
+          priceCents: product.priceCents,
+          currency: product.currency
+        }
+      : null
   };
 }
 
@@ -71,6 +87,11 @@ export async function getPublishedGames() {
       versions: {
         where: { status: "PUBLISHED" },
         orderBy: { versionNumber: "desc" },
+        take: 1
+      },
+      products: {
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
         take: 1
       }
     },
@@ -93,6 +114,11 @@ export async function getGameBySlug(slug: string) {
       versions: {
         where: { status: "PUBLISHED" },
         orderBy: { versionNumber: "desc" },
+        take: 1
+      },
+      products: {
+        where: { status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
         take: 1
       }
     }

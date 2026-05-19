@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 
+import { getCsrfToken } from "../../lib/csrf";
 import { getGameBySlug } from "../../lib/games";
 
 export default async function GameDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const game = await getGameBySlug(slug);
   if (!game) notFound();
+  const csrfToken = await getCsrfToken();
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-16 text-slate-100">
@@ -27,6 +29,22 @@ export default async function GameDetailPage({ params }: { params: Promise<{ slu
             <p className="mt-2 font-semibold text-white">{game.themes.join(", ")}</p>
           </div>
         </div>
+        {game.product && (
+          <div className="mt-8 rounded-3xl border border-white/10 bg-slate-950/80 p-6">
+            <p className="text-sm text-slate-400">Purchase option</p>
+            <p className="mt-2 text-xl font-semibold text-white">{game.product.name}</p>
+            <p className="mt-2 text-slate-300">
+              {game.product.currency} {(game.product.priceCents / 100).toFixed(2)}
+            </p>
+            <form action="/checkout/start" method="post" className="mt-4">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="productId" value={game.product.id} />
+              <button className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-400">
+                Purchase access
+              </button>
+            </form>
+          </div>
+        )}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <a
             href={`/host/create?game=${game.slug}`}

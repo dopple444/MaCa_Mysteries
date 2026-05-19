@@ -4,7 +4,9 @@ import crypto from "crypto";
 import { redirect } from "next/navigation";
 
 import { createGuestSession } from "./guest-auth";
+import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
+import { checkRateLimit } from "./rate-limit";
 
 function generateToken() {
   return crypto.randomBytes(16).toString("base64url");
@@ -23,21 +25,37 @@ function joinRedirect(code: string, error: string): never {
 }
 
 export async function joinParty(formData: FormData) {
+  if (!(await verifyCsrfToken(formData))) {
+    joinRedirect("", "missing");
+  }
   const code = getFormValue(formData, "code").toUpperCase();
   const name = getFormValue(formData, "name");
   const email = getFormValue(formData, "email").toLowerCase();
+  const rateLimit = await checkRateLimit({
+    scope: "join",
+    key: `${code}:${email}`,
+    limit: 15,
+    windowSeconds: 10 * 60
+  });
 
-  if (!code || !name || !email) {
+  if (!rateLimit.allowed) {
+    joinRedirect(code, "rate-limited");
+  }
+
+  if (!code || !name || !email || !email.includes("@")) {
     joinRedirect(code, "missing");
   }
 
   const party = await prisma.party.findUnique({
     where: { inviteCode: code },
-    select: { id: true }
+    select: { id: true, status: true }
   });
 
   if (!party) {
     joinRedirect(code, "invalid");
+  }
+  if (party.status === "COMPLETED") {
+    joinRedirect(code, "closed");
   }
 
   const existingGuest = await prisma.guest.findFirst({
@@ -53,7 +71,7 @@ export async function joinParty(formData: FormData) {
         where: { id: existingGuest.id },
         data: {
           name,
-          status: "JOINED",
+          status: existingGuest.status === "PENDING_APPROVAL" ? "PENDING_APPROVAL" : "JOINED",
           joinedAt
         }
       })
@@ -62,7 +80,7 @@ export async function joinParty(formData: FormData) {
           partyId: party.id,
           name,
           email,
-          status: "JOINED",
+          status: "PENDING_APPROVAL",
           joinedAt,
           guestToken: generateToken()
         }

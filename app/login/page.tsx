@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { login } from "../lib/auth-actions";
+import { getCsrfToken } from "../lib/csrf";
 
 export default async function LoginPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
   const params = await searchParams;
+  const csrfToken = await getCsrfToken();
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-20 text-white">
       <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-10 shadow-2xl shadow-black/20">
@@ -12,8 +14,12 @@ export default async function LoginPage({ searchParams }: { searchParams?: Promi
         {params?.error === "invalid" && (
           <p className="mt-4 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">Invalid email or password.</p>
         )}
+        {params?.error === "rate-limited" && (
+          <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">Too many sign-in attempts. Please wait and try again.</p>
+        )}
 
         <form action={login} className="mt-8 grid gap-4">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
           <label className="block text-sm font-medium text-slate-200">Email</label>
           <input
             name="email"

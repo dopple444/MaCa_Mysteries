@@ -370,7 +370,7 @@ Suggested fields:
 - `total_cents`
 - `created_at`
 
-### game_entitlements
+### user_game_access
 
 Recommended for linking purchases to host ability.
 
@@ -379,13 +379,32 @@ Suggested fields:
 - `id`
 - `user_id`
 - `game_id`
-- `order_item_id`
+- `product_id`
+- `source`
 - `status`
-- `uses_allowed`
-- `uses_consumed`
-- `expires_at`
 - `created_at`
 - `updated_at`
+
+Current Prisma name: `UserGameAccess`.
+
+### payment_webhook_events
+
+Provider webhook idempotency and audit trail.
+
+Suggested fields:
+
+- `id`
+- `provider`
+- `event_id`
+- `event_type`
+- `status`
+- `order_id`
+- `payload`
+- `processed_at`
+- `created_at`
+- `updated_at`
+
+Current Prisma name: `PaymentWebhookEvent`.
 
 ## Party Runtime
 
@@ -546,6 +565,28 @@ Suggested fields:
 
 ## Support And Operations
 
+### outbound_messages
+
+Queued email/SMS delivery records.
+
+Suggested fields:
+
+- `id`
+- `user_id`
+- `party_id`
+- `channel`
+- `recipient`
+- `template_key`
+- `subject`
+- `body_preview`
+- `provider`
+- `provider_message_id`
+- `status`
+- `error_message`
+- `sent_at`
+- `created_at`
+- `updated_at`
+
 ### support_tickets
 
 Customer support requests.
@@ -596,6 +637,21 @@ Important events:
 - Final reveal unlocked
 - Payment completed/refunded
 - Admin content published
+
+### rate_limit_buckets
+
+Database-backed request throttling.
+
+Suggested fields:
+
+- `id`
+- `scope`
+- `key`
+- `window_start`
+- `count`
+- `expires_at`
+- `created_at`
+- `updated_at`
 
 ## Future Marketplace Entities
 
@@ -727,16 +783,17 @@ Useful enums for Prisma:
 
 ## Near-Term Migration From Current Schema
 
-Current schema names:
+Current Prisma names intentionally use PascalCase model names and map naturally to the self-hosted domain:
 
-- `User` -> target `users`
-- `UserSession` -> target `sessions` or `user_sessions`
-- `Party` -> target `party_instances`
-- `Guest` -> target `party_guests`
+- `User`, `UserSession`
+- `Game`, `GameVersion`, `GameCharacter`, `GameRound`, `GameCard`, `GameEvidence`, `GameMediaAsset`, `GameFinalReveal`
+- `Product`, `Order`, `OrderItem`, `UserGameAccess`, `PaymentWebhookEvent`
+- `Party`, `Guest`, `PartyCharacterAssignment`, `PartyRoundState`, `PartyEvidenceReveal`, `PartyFinalRevealState`, `PartyAccusation`, `PartyResult`
+- `OutboundMessage`, `SupportTicket`, `AuditLog`, `RateLimitBucket`
 
 Near-term strategy:
 
-1. Keep the existing models stable until the app has tests or fixture data.
-2. Continue evolving the new game catalog tables before adding full gameplay content.
-3. Add party runtime tables before changing host/player flows.
-4. Avoid destructive renames until migration scripts and seed data are in place.
+1. Keep published `GameVersion` records immutable.
+2. Add editor-specific validation before expanding admin create/edit screens.
+3. Add a dedicated test database before production.
+4. Avoid destructive renames until backup/restore drills and migration scripts are proven.

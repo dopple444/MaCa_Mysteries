@@ -1,16 +1,20 @@
 import Link from "next/link";
 
+import { getCsrfToken } from "../lib/csrf";
 import { joinParty } from "../lib/join-actions";
 
 const errors: Record<string, string> = {
   invalid: "That party code was not found. Check the invite link or ask your host for a new code.",
-  missing: "Please enter your party code, name, and email address."
+  missing: "Please enter your party code, name, and email address.",
+  closed: "This party has already been completed. Ask the host if it should be reopened.",
+  "rate-limited": "Too many join attempts. Please wait and try again."
 };
 
 export default async function JoinPage({ searchParams }: { searchParams?: Promise<{ code?: string; error?: string }> }) {
   const params = await searchParams;
   const code = params?.code;
   const error = params?.error ? errors[params.error] : undefined;
+  const csrfToken = await getCsrfToken();
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-16 text-slate-100">
@@ -23,6 +27,7 @@ export default async function JoinPage({ searchParams }: { searchParams?: Promis
           <p className="mt-6 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>
         )}
         <form action={joinParty} className="mt-8 grid gap-4">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
           <label className="block text-sm font-medium text-slate-200">Party code</label>
           <input
             type="text"

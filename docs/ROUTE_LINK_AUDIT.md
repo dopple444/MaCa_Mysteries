@@ -1,28 +1,28 @@
 # Route And Link Audit
 
-Last inspected: 2026-05-18
+Last inspected: 2026-05-19
 
 ## Summary
 
-The visible public navigation and catalog links are currently routing correctly on the local dev server at:
+The app is currently reachable on the local dev server:
 
 - `http://192.168.2.45:3001`
 - `http://127.0.0.1:3001`
 
-Database configuration is now present for local development:
+Latest live verification:
 
-- `.env` points at the local PostgreSQL database `maca_mysteries`.
-- Prisma migrations have been applied.
-- Public catalog reads now depend on seeded `Game`, `GameVersion`, and `Product` records.
+- `npx prisma format && npx prisma migrate deploy && npx prisma generate`: passed.
+- `./node_modules/.bin/tsc --noEmit`: passed.
+- `npm test`: passed, 38 tests total, 33 pass and 5 skipped when no `TEST_BASE_URL` is set.
+- `npm run build`: passed.
+- `TEST_BASE_URL=http://127.0.0.1:3001 npm test`: passed, 38 tests total, 38 pass, 0 skipped.
 
-## Server State
+## Current Server State
 
-Initial route probes returned `500` for every route because the existing Next dev server had a stale/corrupt `.next` cache:
-
-- Error: `Cannot find module './331.js'`
-- Source: `.next/server/webpack-runtime.js`
-
-Clearing `.next` resolved that stale build issue. The app then compiled and served routes successfully.
+- The previous process on port `3001` was stopped.
+- The current dev server is running in detached tmux session `maca-mysteries`.
+- The tmux command is `npm run dev -- -H 0.0.0.0 -p 3001`.
+- Next reported ready on port `3001`, and `/games` returned `200 OK` on both `127.0.0.1` and `192.168.2.45`.
 
 ## Verified Routes
 
@@ -30,16 +30,18 @@ Clearing `.next` resolved that stale build issue. The app then compiled and serv
 | --- | --- | --- |
 | `/` | `200 OK` | Public home page renders. |
 | `/host` | `200 OK` | Public host information page renders. |
-| `/join` | `200 OK` | Guest join form renders and submits to the join backend action. |
-| `/play` | `307 Temporary Redirect` | Redirects to `/join` without a guest cookie; renders player lobby after joining. |
+| `/join` | `200 OK` | Guest join form renders. |
+| `/support` | `200 OK` | Support ticket form renders. |
 | `/games` | `200 OK` | Public database-backed catalog renders. |
-| `/games/the-last-curtain` | `200 OK` | Game detail route renders. |
-| `/games/murder-at-hollow-lake` | `200 OK` | Game detail route renders. |
-| `/games/not-a-real-game` | `404 Not Found` | Expected behavior from `notFound()`. |
-| `/login` | `200 OK` | Login page renders. Server action depends on Prisma. |
-| `/signup` | `200 OK` | Signup page renders. Server action depends on Prisma. |
-| `/dashboard` | `307 Temporary Redirect` | Expected unauthenticated redirect to `/login`. |
-| `/host/create?game=the-last-curtain` | `307 Temporary Redirect` | Expected unauthenticated redirect to `/login`. |
+| `/games/the-last-curtain` | Covered by live tests | Game detail route renders when seeded. |
+| `/games/murder-at-hollow-lake` | Covered by live tests | Game detail route renders when seeded. |
+| `/games/not-a-real-game` | Covered by live tests | Expected `404 Not Found`. |
+| `/login` | Covered by live tests | Login page renders and auth flow is exercised. |
+| `/signup` | Covered by live tests | Signup page renders and auth flow is exercised. |
+| `/dashboard` | `307 Temporary Redirect` unauthenticated | Expected redirect to `/login`; authenticated dashboard covered by live tests. |
+| `/account/orders` | Auth-gated | Expected redirect to `/login` when unauthenticated. |
+| `/account/notifications` | `307 Temporary Redirect` unauthenticated | Expected redirect to `/login`. |
+| `/admin` | `307 Temporary Redirect` unauthenticated | Expected redirect to `/login`; admin access covered by live tests. |
 | `/api/health` | `200 OK` | Returns JSON status and timestamp. |
 | `/api/games` | `200 OK` | Returns public-safe database-backed JSON game list. |
 
@@ -49,55 +51,53 @@ Clearing `.next` resolved that stale build issue. The app then compiled and serv
 | --- | --- | --- | --- |
 | `app/layout.tsx` | `/` | OK | Header brand link. |
 | `app/layout.tsx` | `/host` | OK | Public host page. |
-| `app/layout.tsx` | `/join` | OK | Join shell. |
+| `app/layout.tsx` | `/join` | OK | Guest join form. |
 | `app/layout.tsx` | `/games` | OK | Catalog page. |
-| `app/page.tsx` | `/host` | OK | CTA says `Host dashboard`, but it actually opens public host intro page. Copy may need adjustment later. |
-| `app/page.tsx` | `/join` | OK | Public guest join form. |
+| `app/page.tsx` | `/host` | OK | Public host CTA. |
+| `app/page.tsx` | `/join` | OK | Public guest join CTA. |
 | `app/host/page.tsx` | `/games` | OK | Catalog CTA. |
 | `app/host/page.tsx` | `/join` | OK | Join CTA. |
-| `app/games/page.tsx` | `/games/the-last-curtain` | OK | Dynamic game detail route. |
-| `app/games/page.tsx` | `/games/murder-at-hollow-lake` | OK | Dynamic game detail route. |
-| `app/games/[slug]/page.tsx` | `/host/create?game=slug` | OK, auth-gated | Redirects to `/login` when unauthenticated. |
-| `app/games/[slug]/page.tsx` | `/host` | OK | Button text says `Invite guests`, but it routes to the host intro page. Copy/target likely needs refinement later. |
+| `app/games/page.tsx` | `/games/[slug]` | OK | Dynamic game detail route. |
+| `app/games/[slug]/page.tsx` | `/checkout/start` | OK, auth-gated | Purchase form redirects unauthenticated users to `/login`; creates pending orders when authenticated and no entitlement exists. |
+| `app/games/[slug]/page.tsx` | `/host/create?game=slug` | OK, auth-gated | Start-party link redirects unauthenticated users to `/login`. |
 | `app/login/page.tsx` | `/signup` | OK | Signup page renders. |
 | `app/signup/page.tsx` | `/login` | OK | Login page renders. |
-| `app/dashboard/page.tsx` | `/host` | OK | Dashboard requires auth first. |
-| `app/dashboard/page.tsx` | `/games` | OK | Dashboard requires auth first. |
-| `app/host/party/[partyId]/page.tsx` | `/join?code=INVITECODE` | OK shell only | Join page pre-fills code but does not yet look up party or join guest. |
+| `app/dashboard/page.tsx` | `/host` | OK, auth-gated | Dashboard requires auth first. |
+| `app/dashboard/page.tsx` | `/games` | OK, auth-gated | Dashboard requires auth first. |
+| `app/dashboard/page.tsx` | `/account/notifications` | OK, auth-gated | Notification settings require auth. |
+| `app/dashboard/page.tsx` | `/account/orders` | OK, auth-gated | Order/access history requires auth. |
+| `app/host/party/[partyId]/page.tsx` | `/join?code=INVITECODE` | OK | Join page pre-fills code and backend join flow is implemented. |
+| `app/admin/page.tsx` | `/admin/games/new` | OK, admin-gated | Draft game creation form. |
+| `app/admin/page.tsx` | `/admin/games/[gameId]` | OK, admin-gated | Game detail/admin content inspection. |
+| `app/admin/page.tsx` | `/admin/orders/[orderId]` | OK, admin-gated | Order detail. |
+| `app/admin/page.tsx` | `/admin/support/[ticketId]` | OK, admin-gated | Support ticket detail. |
 
 ## Action/Form Status
 
-| Form/action | Current status | Blocker |
+| Form/action | Current status | Notes |
 | --- | --- | --- |
-| Login | Page renders. Action uses Prisma. | Requires an existing user account. |
-| Signup | Page renders. Action uses Prisma. | No current setup blocker found. |
-| Logout | Requires active session. | Depends on session table. |
-| Create party | Route redirects to login when unauthenticated. Action uses Prisma and validates the selected published game. | Requires auth session. |
-| Add guest | Present on party detail page. Action uses Prisma and verifies party ownership. | Requires auth session and existing owned party. |
-| Join party | Shell only. | No server action or route handler implemented yet. |
+| Login | Implemented | Uses Prisma, rate limiting, CSRF, password hash verification, and session creation. |
+| Signup | Implemented | Uses Prisma, rate limiting, CSRF, password hashing, and session creation. |
+| Logout | Implemented | Requires CSRF and clears the session. |
+| Notification settings | Implemented | Saves email/SMS preferences and phone number. |
+| Create party | Implemented | Requires auth, game access check, CSRF, published game/version, guest parsing, round/final reveal initialization, and invitation queueing. |
+| Add/approve guest | Implemented | Requires party ownership, CSRF, and non-completed party. |
+| Join party | Implemented | Supports invited guests, pending approval for unknown emails, rate limiting, CSRF, and guest cookie. |
+| Character assignment | Implemented | Supports assign, replace, and clear with uniqueness rules and audit logs. |
+| Round controls | Implemented | Supports unlock/start/complete with audit logs and completed-party blocking. |
+| Evidence controls | Implemented | Supports reveal/hide with audit logs and player-safe visibility. |
+| Final reveal controls | Implemented | Supports victim reveal and solution reveal with round gates and audit logs. |
+| Accusation form | Implemented | Player accusation create/update is guarded by guest cookie, round state, CSRF, and completed-party blocking. |
+| Party completion/reopen | Implemented | Creates/removes `PartyResult` and blocks/re-enables runtime mutations. |
+| Checkout start | Implemented foundation | Creates pending orders and redirects to Stripe when credentials exist; otherwise returns provider-not-configured. |
+| Stripe webhook | Implemented foundation | Verifies signature, records event IDs idempotently, marks paid orders, and grants game access. |
+| Support ticket | Implemented | Public/account support intake with rate limiting and CSRF. |
+| Admin status/edit forms | Implemented | Admin-only game metadata, version status, support status, and outbound retry controls. |
 
-## Build Check
+## Remaining Link/Route Work
 
-`npm run build` initially failed while the dev server/cache was in a bad state:
-
-- Failure point: page data collection for `/_not-found`
-
-After clearing the stale `.next` output and rerunning:
-
-- `npx next build --debug` completed successfully.
-- All current app routes were included in the build output.
-
-## Next Fixes Before More Link Testing
-
-1. Restore/fix the local Git repository state.
-2. Create a local `.env` from `.env.example`.
-3. Set `DATABASE_URL` for the intended PostgreSQL database.
-4. Run Prisma validate/generate/migrate against the confirmed database.
-5. Create a seed host account or use signup after migrations are in place.
-6. Re-test the authenticated flow:
-   - `/signup`
-   - `/dashboard`
-   - `/games/the-last-curtain`
-   - `/host/create?game=the-last-curtain`
-   - `/host/party/[partyId]`
-   - `/join?code=INVITECODE`
+1. Add `/account/orders` for customer purchase history and game access.
+2. Add deeper admin editors for characters, rounds, cards, evidence, media, and final reveal content.
+3. Add upload routes after object storage is configured.
+4. Add support reply routes after email provider delivery is selected.
+5. Add creator routes later, after the first-party MVP is stable.

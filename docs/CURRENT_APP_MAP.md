@@ -164,24 +164,24 @@ Game catalog data is now database-backed:
 ### Party Management
 
 1. `/host/party/[partyId]` requires login.
-2. Page loads party by ID with guests.
+2. Page loads party by ID with guests, assignments, rounds, evidence, media, accusations, final reveal state, party result, and recent audit activity.
 3. Page verifies `party.hostId === user.id`.
 4. Host can add one guest at a time through `addGuest()`.
 5. Invite link is displayed as `/join?code=INVITECODE`.
+6. Host can approve pending guests, assign/clear characters, resend invites, unlock/start/complete rounds, reveal/hide evidence, reveal/hide victim/final solution content, and complete/reopen a party.
+7. Completed parties block gameplay mutations until reopened.
 
 ### Guest Joining
 
-`/join` now supports the first guest join flow:
+`/join` supports the guest join flow:
 
 1. Guest opens `/join?code=INVITECODE` or enters a party code manually.
 2. Guest enters name and email.
 3. `joinParty()` looks up the party by invite code.
 4. If the email matches an invited guest for that party, that guest is updated.
-5. If no invited guest matches, a joined guest is created using the invite code as the shared secret.
-6. Guest status is set to `JOINED`, `joinedAt` is recorded, and an HTTP-only `maca_guest` cookie is set.
-7. Guest is redirected to `/play`.
-
-It does not yet assign characters or show player cards/clues.
+5. If no invited guest matches, a pending guest request is created for host approval.
+6. Joined guests receive an HTTP-only `maca_guest` cookie and are redirected to `/play`.
+7. Player-visible cards, evidence, media, accusations, victim reveal, and final reveal content are filtered by assignment, round state, and reveal state.
 
 ## Current Database Model
 
@@ -192,25 +192,35 @@ The current Prisma schema contains:
 - `UserSession`
 - `Game`
 - `GameVersion`
+- `GameCharacter`
+- `GameRound`
+- `GameCard`
+- `GameEvidence`
+- `GameMediaAsset`
+- `GameFinalReveal`
 - `Product`
+- `Order`
+- `OrderItem`
+- `UserGameAccess`
+- `PaymentWebhookEvent`
 - `Party`
-- `Guest`, including `joinedAt`
+- `Guest`
+- `PartyCharacterAssignment`
+- `PartyRoundState`
+- `PartyEvidenceReveal`
+- `PartyFinalRevealState`
+- `PartyAccusation`
+- `PartyResult`
+- `OutboundMessage`
+- `SupportTicket`
+- `AuditLog`
+- `RateLimitBucket`
 
-Current model coverage is useful as a scaffold, but it is far short of the target game platform. It does not yet include:
-
-- Orders
-- Characters and assignments
-- Required/optional character rules
-- Rounds and round state
-- Cards, clues, evidence, media, messages, accusations, or final reveals
-- Spoiler rules
-- Admin publishing workflow
-- Marketplace entities
-- Audit logging
+Current model coverage is strong enough for the first-party MVP foundation. Still missing or shallow areas include full admin content editors, support reply history, real provider delivery records, upload object metadata beyond seeded assets, fine-grained admin roles, and future marketplace entities.
 
 ## Current Architectural Assessment
 
-The current app is a clean early scaffold rather than a full Base44 migration target. It already points toward the desired self-hosted stack, but it is not yet production-ready.
+The current app is now a working self-hosted MVP foundation rather than only a scaffold. It still needs production hardening and content editing depth, but the main first-party purchase, hosting, guest, round, evidence, accusation, reveal, support, and admin foundations are in place.
 
 Strengths:
 
@@ -219,19 +229,19 @@ Strengths:
 - Prisma/PostgreSQL foundation already present.
 - Server Actions keep simple auth and party flows compact.
 - Session cookie is HTTP-only and stores only opaque random tokens.
-- Host ownership check exists on the party detail screen.
+- Host ownership checks exist on party pages and mutation routes.
+- Game, version, character, round, card, evidence, media, final reveal, party, guest, assignment, accusation, result, order, support, audit, outbound message, webhook, and rate-limit models exist.
+- CSRF tokens are wired into mutation forms and route handlers, with strict production rejection.
+- Rate limiting protects auth, join, support, and checkout-start flows.
+- Stripe-ready checkout and signed webhook handling exist, but provider credentials are not configured.
+- Docker production scaffolding and deployment notes exist, while the current live server still runs directly on Ubuntu.
 
 Gaps:
 
-- No full game content data model.
-- No payment/order ownership checks for activating games.
-- Guest join has a basic backend flow, but no character assignment or player cards yet.
-- No character assignment.
-- No round engine.
-- No spoiler-safe content access layer.
-- No media storage layer.
-- No email/SMS invite integration.
-- No admin game editor.
-- Game catalog has basic database records, but not the full game-content model yet.
-- Auth lacks password reset, email verification, rate limiting, CSRF hardening review, and account management.
-- `.git` is not a usable repository in this workspace.
+- Admin content editing is still shallow; metadata and draft game creation exist, but full character, round, card, evidence, media, and final reveal editors are still needed.
+- Real payment processing needs Stripe test credentials and dashboard/webhook verification before selling games.
+- Email and SMS records can be queued, failed, and retried, but no real provider adapter is enabled yet.
+- Media upload endpoints are not enabled yet; storage policy helpers exist.
+- Auth still lacks password reset, email verification, account recovery, and session revocation.
+- Admin roles are still coarse: `ADMIN` is all-powerful.
+- A dedicated test database and backup automation are still needed before production launch.

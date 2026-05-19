@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { signup } from "../lib/auth-actions";
+import { getCsrfToken } from "../lib/csrf";
 
 export default async function SignupPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
   const params = await searchParams;
+  const csrfToken = await getCsrfToken();
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-20 text-white">
       <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-10 shadow-2xl shadow-black/20">
@@ -15,8 +17,12 @@ export default async function SignupPage({ searchParams }: { searchParams?: Prom
         {params?.error === "exists" && (
           <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">That email is already registered.</p>
         )}
+        {params?.error === "rate-limited" && (
+          <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">Too many signup attempts. Please wait and try again.</p>
+        )}
 
         <form action={signup} className="mt-8 grid gap-4">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
           <label className="block text-sm font-medium text-slate-200">Full name</label>
           <input
             name="name"

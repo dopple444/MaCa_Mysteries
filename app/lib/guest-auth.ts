@@ -29,19 +29,80 @@ export async function getCurrentGuest() {
   const guest = await prisma.guest.findUnique({
     where: { guestToken },
     include: {
+      assignments: {
+        include: {
+          character: true
+        }
+      },
       party: {
         include: {
           game: true,
-          gameVersion: true
+          gameVersion: {
+            include: {
+              characters: {
+                orderBy: [
+                  { isRequired: "desc" },
+                  { sortOrder: "asc" },
+                  { name: "asc" }
+                ]
+              },
+              mediaAssets: {
+                orderBy: [
+                  { sortOrder: "asc" },
+                  { title: "asc" }
+                ]
+              }
+            }
+          },
+          roundStates: {
+            include: {
+              gameRound: {
+                include: {
+                  cards: {
+                    orderBy: [
+                      { sortOrder: "asc" },
+                      { title: "asc" }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          evidenceReveals: {
+            include: {
+              evidence: {
+                include: {
+                  gameRound: true
+                }
+              }
+            },
+            orderBy: {
+              revealedAt: "asc"
+            }
+          },
+          accusations: {
+            where: {
+              guest: {
+                guestToken
+              }
+            }
+          },
+          finalRevealState: {
+            include: {
+              finalReveal: {
+                include: {
+                  victimCharacter: true,
+                  killerCharacter: true
+                }
+              }
+            }
+          }
         }
       }
     }
   });
 
-  if (!guest) {
-    cookieStore.delete(GUEST_COOKIE);
-    return null;
-  }
+  if (!guest) return null;
 
   return guest;
 }
