@@ -1,6 +1,6 @@
 # Next Steps
 
-Last inspected: 2026-05-19
+Last inspected: 2026-05-21
 
 ## Current Baseline Completed
 
@@ -23,6 +23,10 @@ Last inspected: 2026-05-19
 - Purchase gating service checks active products, development bypass, and `UserGameAccess`.
 - Checkout-start creates pending orders and can redirect to Stripe when provider settings exist.
 - Stripe webhook route verifies signatures, records provider event IDs idempotently, marks paid orders, and grants game access.
+- Stripe test mode is configured locally and a sandbox checkout has completed successfully.
+- Stripe webhook forwarding is running through the local Stripe CLI and processed `checkout.session.completed`.
+- Sandbox purchase fulfillment granted active access to Murder at Hollow Lake.
+- Payment setup docs and config check scripts exist in `docs/PAYMENT_PROVIDER_SETUP.md` and `npm run payment:check`.
 - Invitation email drafts are queued in `OutboundMessage` when parties are created, guests are added, or invites are resent.
 - Outbound email/SMS provider helpers, queued email creation, sent/failed markers, and retry controls exist.
 - SMS preference model and account notification settings screen exist; real SMS sending remains disabled until a provider is chosen.
@@ -53,15 +57,15 @@ Last inspected: 2026-05-19
    - Add a documented `DATABASE_URL_TEST`.
    - Keep live-route tests able to target the dev server.
 
-4. Configure Stripe test mode.
-   - Set `PAYMENT_PROVIDER=stripe`, `APP_URL`, `STRIPE_SECRET_KEY`, and `STRIPE_WEBHOOK_SECRET`.
-   - Run a test checkout from game detail to Stripe.
-   - Confirm webhook fulfillment grants game access.
+4. Clean up payment test operations.
+   - Add stale pending-order handling for abandoned Stripe sessions.
+   - Add admin reconcile tools for paid Stripe sessions that did not fulfill.
+   - Document how to restart the app server and Stripe listener together.
 
 5. Expand payment observability.
-   - Add retry/reconcile tools for paid Stripe sessions that did not fulfill.
    - Add structured logs for checkout/session/webhook failures.
    - Add alerts for stuck pending orders and failed webhook events.
+   - Add filters for abandoned sessions and repeated checkout attempts.
 
 6. Choose and implement the email provider.
    - Pick Resend, Postmark, SendGrid, SES, or another transactional provider.

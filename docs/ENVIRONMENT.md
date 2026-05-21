@@ -13,13 +13,15 @@ Last updated: 2026-05-19
 
 ## Payment Provider
 
-Stripe is the first provider target. The code remains safe when these are absent: checkout creates no provider session and returns a not-configured response.
+Stripe is the first provider target. Local `.env` can safely set `PAYMENT_PROVIDER=stripe` before keys exist; checkout returns a not-configured response until the Stripe secret key is added.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `PAYMENT_PROVIDER` | When enabling payments | Set to `stripe` to enable Stripe checkout session creation. |
 | `STRIPE_SECRET_KEY` | When enabling Stripe checkout | Secret API key used to create checkout sessions. |
 | `STRIPE_WEBHOOK_SECRET` | When enabling Stripe webhooks | Webhook signing secret used by `/api/webhooks/payments/stripe`. |
+
+See `docs/PAYMENT_PROVIDER_SETUP.md` for the Stripe setup and test-checkout checklist.
 
 ## Outbound Messages
 

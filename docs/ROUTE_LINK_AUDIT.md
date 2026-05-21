@@ -16,11 +16,13 @@ Latest live verification:
 - `npm test`: passed, 38 tests total, 33 pass and 5 skipped when no `TEST_BASE_URL` is set.
 - `npm run build`: passed.
 - `TEST_BASE_URL=http://127.0.0.1:3001 npm test`: passed, 38 tests total, 38 pass, 0 skipped.
+- Stripe sandbox checkout completed on 2026-05-21: webhook returned `200`, order became `PAID`, and active game access was granted.
 
 ## Current Server State
 
 - The previous process on port `3001` was stopped.
 - The current dev server is running in detached tmux session `maca-mysteries`.
+- The Stripe webhook listener is running in detached tmux session `maca-stripe-listener`.
 - The tmux command is `npm run dev -- -H 0.0.0.0 -p 3001`.
 - Next reported ready on port `3001`, and `/games` returned `200 OK` on both `127.0.0.1` and `192.168.2.45`.
 

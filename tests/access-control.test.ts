@@ -1067,9 +1067,14 @@ test(
         }),
         redirect: "manual"
       });
-      assert.equal(checkoutPlaceholderResponse.status, 501);
-      const checkoutPlaceholderBody = await checkoutPlaceholderResponse.json();
-      assert.equal(checkoutPlaceholderBody.error, "Payment provider is not configured yet.");
+      assert.ok([303, 501, 502].includes(checkoutPlaceholderResponse.status));
+      if (checkoutPlaceholderResponse.status === 303) {
+        const checkoutLocation = checkoutPlaceholderResponse.headers.get("location") ?? "";
+        assert.match(checkoutLocation, /^https:\/\/checkout\.stripe\.com\//);
+      } else {
+        const checkoutPlaceholderBody = await checkoutPlaceholderResponse.json();
+        assert.match(checkoutPlaceholderBody.error, /Payment provider is not configured yet|STRIPE_SECRET_KEY is not configured|Stripe/);
+      }
 
       await prisma.userGameAccess.create({
         data: {

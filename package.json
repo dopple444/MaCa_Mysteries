@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "test": "node --import tsx --test tests/*.test.ts",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "payment:check": "tsx scripts/check-payment-config.ts",
+    "stripe:login": "./tools/stripe/stripe login",
+    "stripe:listen": "./tools/stripe/stripe listen --forward-to http://127.0.0.1:3001/api/webhooks/payments/stripe --events checkout.session.completed"
   },
   "dependencies": {
     "next": "^15.0.3",
