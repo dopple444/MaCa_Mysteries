@@ -3,6 +3,8 @@ node_modules
 out
 .DS_Store
 .env
+.env.*
+!.env.example
 tsconfig.tsbuildinfo
 tools/stripe/
 public/uploads/

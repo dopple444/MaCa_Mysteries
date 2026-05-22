@@ -55,8 +55,8 @@ Last inspected: 2026-05-22
 ## Next 20 Development Steps
 
 1. Keep Git healthy.
-   - Review the large uncommitted working tree.
-   - Commit the completed platform slice when ready.
+   - Status: implemented save point.
+   - Commit `725ded9` saves the completed platform foundation and conditional reveal engine slice.
    - Keep future commits smaller and feature-scoped.
 
 2. Run the live smoke suite after every server restart.
@@ -164,6 +164,9 @@ Last inspected: 2026-05-22
    - Audit permission changes.
 
 18. Prepare production process, network layer, and security gates.
+   - Status: in progress.
+   - Docker production Compose now passes public URL, CSRF/account secrets, provider settings, and app health checks into the app container.
+   - Production startup now requires `APP_URL`, `CSRF_SECRET`, and `ACCOUNT_TOKEN_SECRET`, and rejects placeholder-grade secrets.
    - Choose direct process manager versus Docker cutover.
    - Add reverse proxy, TLS, firewall, health checks, and restart policy.
    - Keep CSRF protection, rate limiting, access control tests, host spoiler-safe mode, and player-safe content projections active as every new route is added.

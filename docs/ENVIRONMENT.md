@@ -1,6 +1,6 @@
 # Environment Variables
 
-Last updated: 2026-05-19
+Last updated: 2026-05-22
 
 ## Required Now
 
@@ -60,7 +60,17 @@ Local admin upload endpoints are enabled. Public local uploads are written under
 
 ## Validation
 
-The app validates required server environment variables from `app/lib/env.ts`. At the moment, `DATABASE_URL` is the only hard startup requirement.
+The app validates required server environment variables from `app/lib/env.ts`.
+
+In development and test, `DATABASE_URL` is the only hard startup requirement.
+
+In production, startup also requires:
+
+- `APP_URL`
+- `CSRF_SECRET`
+- `ACCOUNT_TOKEN_SECRET`
+
+Production rejects placeholder-grade or short `CSRF_SECRET` and `ACCOUNT_TOKEN_SECRET` values. Use separate `openssl rand -hex 32` values for each.
 
 If startup fails with:
 
@@ -69,6 +79,20 @@ Missing required server environment variable(s): DATABASE_URL
 ```
 
 then load the app environment before running Next, Prisma, tests, or scripts.
+
+If production startup fails with:
+
+```text
+Missing required server environment variable(s): APP_URL, CSRF_SECRET, ACCOUNT_TOKEN_SECRET
+```
+
+or:
+
+```text
+Unsafe production environment variable(s): CSRF_SECRET, ACCOUNT_TOKEN_SECRET
+```
+
+then set real public URL and secret values before restarting the app.
 
 ## Development Notes
 
