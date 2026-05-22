@@ -11,6 +11,16 @@ cd /home/dopple444/projects/MaCa_Mysteries
 npm run dev -- -H 0.0.0.0 -p 3001
 ```
 
+For unattended staging windows, run the app inside the `maca-mysteries` tmux session with a restart loop:
+
+```bash
+tmux kill-session -t maca-mysteries 2>/dev/null || true
+tmux new-session -d -s maca-mysteries
+tmux send-keys -t maca-mysteries 'cd /home/dopple444/projects/MaCa_Mysteries && while true; do echo "[$(date -Is)] starting MaCa Mysteries staging"; npm run dev -- -H 0.0.0.0 -p 3001; echo "[$(date -Is)] staging server exited; restarting in 5 seconds"; sleep 5; done' C-m
+```
+
+Cloudflare Tunnel is installed as an enabled `cloudflared.service` system service and points `staging.macamysteries.com` to `http://localhost:3001`.
+
 ## Production Docker Files
 
 - `Dockerfile`

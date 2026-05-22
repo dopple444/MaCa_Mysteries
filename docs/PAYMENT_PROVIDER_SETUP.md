@@ -157,6 +157,9 @@ Current staging readiness result:
 - `https://staging.macamysteries.com/api/health` returns healthy.
 - The webhook endpoint is publicly reachable and rejects invalid signatures with `400`.
 - Automated staging tests pass against the public URL.
+- Public sandbox checkout with an external test user completed successfully on 2026-05-22.
+- The Stripe Dashboard webhook endpoint was corrected to listen for `checkout.session.completed`.
+- The external test order was marked `PAID`, active game access was granted, and a `purchase_confirmation` email was queued.
 
 ## Payment Maintenance
 
