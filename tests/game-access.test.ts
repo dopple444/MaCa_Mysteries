@@ -219,6 +219,14 @@ test("fulfillPaidOrder grants game access idempotently", async () => {
       }
     });
     assert.equal(accessAfterSecondFulfillment.length, 1);
+
+    const confirmationCount = await prisma.outboundMessage.count({
+      where: {
+        userId: user.id,
+        templateKey: "purchase_confirmation"
+      }
+    });
+    assert.equal(confirmationCount, 1);
   } finally {
     await deleteTestData(slugPrefix, emailDomain);
   }

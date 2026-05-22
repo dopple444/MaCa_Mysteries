@@ -1,8 +1,8 @@
 # Payment Provider Setup
 
-Last updated: 2026-05-21
+Last updated: 2026-05-22
 
-The app is wired for Stripe Checkout as the first payment provider. Sandbox checkout has been tested successfully with Stripe-hosted payment collection, webhook forwarding, paid order fulfillment, and active game access.
+The app is wired for Stripe Checkout as the first payment provider. Sandbox checkout has been tested successfully with Stripe-hosted payment collection, paid order fulfillment, active game access, and queued purchase confirmation emails.
 
 Official references:
 
@@ -11,23 +11,25 @@ Official references:
 - Stripe CLI install: https://docs.stripe.com/stripe-cli/install
 - Stripe test cards: https://docs.stripe.com/testing
 
-## Current Local State
+## Current Staging State
 
-Local `.env` has been prepared with Stripe mode flags:
+Local `.env` is intentionally not committed, but the running staging server should be prepared with Stripe mode flags shaped like this:
 
 ```text
-APP_URL="http://192.168.2.45:3001"
+APP_URL="https://staging.macamysteries.com"
 PAYMENT_PROVIDER="stripe"
-STRIPE_SECRET_KEY=""
-STRIPE_WEBHOOK_SECRET=""
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
 
 Secrets are intentionally omitted from this document. `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are set locally if `npm run payment:check` reports them as set.
 
-## Stripe Dashboard Setup
+The public staging site currently runs through Cloudflare Tunnel to the Ubuntu dev server on port `3001`. The old local Stripe CLI listener is no longer required for staging once the Stripe Dashboard webhook endpoint is active.
+
+## Stripe API Key Setup
 
 1. Create or sign in to a Stripe account.
-2. Keep the dashboard in test mode while we are testing.
+2. Keep the dashboard in Sandbox/Test mode while we are testing.
 3. Open Developers > API keys.
 4. Copy the test secret key.
 5. Put it in `.env`:
@@ -38,9 +40,30 @@ STRIPE_SECRET_KEY="sk_test_..."
 
 Do not paste live keys into chat, commit them, or put them in `.env.example`.
 
-## Local Webhook Setup
+## Stripe Dashboard Webhook Setup
 
-The local app webhook endpoint is:
+Create a Stripe Dashboard webhook endpoint in Sandbox/Test mode:
+
+```text
+https://staging.macamysteries.com/api/webhooks/payments/stripe
+```
+
+Use:
+
+- Endpoint type: Account
+- Event selection: `checkout.session.completed`
+
+After creating the endpoint, reveal the signing secret that starts with `whsec_` and put it in `.env`:
+
+```text
+STRIPE_WEBHOOK_SECRET="whsec_..."
+```
+
+Restart the app after editing `.env`. The app verifies the Stripe signature, records webhook events idempotently, marks paid orders, grants game access, and queues a purchase confirmation email.
+
+## Optional Local Webhook Setup
+
+Use this only when testing on `127.0.0.1` without the public staging tunnel. The local app webhook endpoint is:
 
 ```text
 http://127.0.0.1:3001/api/webhooks/payments/stripe
@@ -68,9 +91,7 @@ Stripe CLI will print a webhook signing secret that starts with `whsec_`. Put th
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
 
-Restart the local server after editing `.env`.
-
-The current development listener runs in tmux session `maca-stripe-listener`.
+Restart the local server after editing `.env`. If you use the local listener, run it in tmux session `maca-stripe-listener` and remember that its `whsec_` value is different from the Stripe Dashboard webhook secret.
 
 ## Verify Configuration
 
@@ -88,9 +109,9 @@ Stripe payment provider settings look ready.
 
 The current local setup has passed this check.
 
-## Restart Local App And Webhook Listener
+## Restart Staging App
 
-Use this pair when the app cannot be reached or after `.env` payment changes:
+Use this when the app cannot be reached or after `.env` payment changes:
 
 ```bash
 tmux kill-session -t maca-mysteries 2>/dev/null || true
@@ -99,25 +120,19 @@ tmux new-session -d -s maca-mysteries
 tmux send-keys -t maca-mysteries 'cd /home/dopple444/projects/MaCa_Mysteries && npm run dev -- -H 0.0.0.0 -p 3001' C-m
 ```
 
-Restart the Stripe webhook listener:
-
-```bash
-tmux kill-session -t maca-stripe-listener 2>/dev/null || true
-tmux new-session -d -s maca-stripe-listener
-tmux send-keys -t maca-stripe-listener 'cd /home/dopple444/projects/MaCa_Mysteries && npm run stripe:listen' C-m
-```
-
 Then verify:
 
 ```bash
-curl -I http://127.0.0.1:3001/games
+curl -I https://staging.macamysteries.com/games
 tmux ls
 ```
 
+`tmux ls` should show the `maca-mysteries` app session. It does not need to show `maca-stripe-listener` for staging Dashboard webhook delivery.
+
 ## Test Checkout
 
-1. Make sure the dev server is running at `http://192.168.2.45:3001`.
-2. Make sure the Stripe CLI listener is running.
+1. Make sure the staging site is running at `https://staging.macamysteries.com`.
+2. Make sure the Stripe Dashboard webhook endpoint is active in Sandbox/Test mode.
 3. Sign in to the app.
 4. Open a published game detail page.
 5. Use `Purchase access`.
@@ -126,15 +141,22 @@ tmux ls
    - Stripe redirects back to the app.
    - Admin order detail shows the order as paid.
    - Admin payment webhooks shows a processed `checkout.session.completed` event.
+   - Admin outbound messages shows a `purchase_confirmation` email queued.
    - The account order/access page shows active game access.
    - The host can create a party for the purchased game.
 
-Latest sandbox result:
+Previous sandbox result:
 
 - `checkout.session.completed` was received from Stripe.
 - Webhook route returned `200`.
-- Local order status changed to `PAID`.
+- Order status changed to `PAID`.
 - `UserGameAccess` was created for Murder at Hollow Lake.
+
+Current staging readiness result:
+
+- `https://staging.macamysteries.com/api/health` returns healthy.
+- The webhook endpoint is publicly reachable and rejects invalid signatures with `400`.
+- Automated staging tests pass against the public URL.
 
 ## Payment Maintenance
 

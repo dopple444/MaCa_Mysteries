@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-22
 
-The current live development server still runs directly on Ubuntu at `http://192.168.2.45:3001`. Docker production scaffolding has been added, but the running server has not been switched to Docker.
+The current live development server still runs directly on Ubuntu at `http://192.168.2.45:3001` and is exposed for staging through Cloudflare Tunnel at `https://staging.macamysteries.com`. Docker production scaffolding has been added, but the running server has not been switched to Docker.
 
 ## Current Local Server
 
@@ -72,7 +72,7 @@ openssl rand -hex 32
 The recommended public test path is:
 
 1. Keep the current LAN dev server running until staging passes.
-2. Point a staging domain, for example `staging.macamysteries.com`, to the server public IP.
+2. Route `staging.macamysteries.com` through Cloudflare Tunnel to the local app service, currently `http://localhost:3001`.
 3. Create a staging environment file outside Git with at least:
 
 `.env.*` files are ignored by Git, but keep staging/live env files out of commits and do not paste provider secrets into docs or chat.
@@ -104,7 +104,7 @@ docker compose --env-file /path/to/staging.env -f docker-compose.prod.yml up --b
 ```
 
 6. Run migrations and health checks through the app container logs. The app container runs `npx prisma migrate deploy` before `next start`.
-7. Put Nginx/Caddy/Apache in front of `127.0.0.1:3002` with HTTPS.
+7. For Docker staging, move the Cloudflare Tunnel service target from `http://localhost:3001` to the Docker app port, for example `http://localhost:3002`. A traditional Nginx/Caddy/Apache reverse proxy can still be used later for a data-center deployment.
 8. Run:
 
 ```bash

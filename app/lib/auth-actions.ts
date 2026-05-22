@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createSession, clearSession, hashPassword, verifyPassword } from "./auth";
 import { queueEmailVerificationMessage } from "./account-security";
+import { getPostLoginRedirectPath } from "./auth-flow";
 import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
 import { checkRateLimit } from "./rate-limit";
@@ -40,8 +41,11 @@ export async function login(formData: FormData) {
   }
 
   await createSession(user.id);
-  await queueEmailVerificationMessage(user.id);
-  redirect("/account/verify-email?sent=1");
+  const destination = getPostLoginRedirectPath(user);
+  if (!user.emailVerifiedAt) {
+    await queueEmailVerificationMessage(user.id);
+  }
+  redirect(destination);
 }
 
 export async function signup(formData: FormData) {

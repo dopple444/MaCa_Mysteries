@@ -220,6 +220,16 @@ test("Stripe checkout.completed webhook marks orders paid and grants access", as
     });
     assert.equal(access?.status, "ACTIVE");
 
+    const confirmationMessages = await prisma.outboundMessage.findMany({
+      where: {
+        userId: fixture.user.id,
+        templateKey: "purchase_confirmation"
+      }
+    });
+    assert.equal(confirmationMessages.length, 1);
+    assert.equal(confirmationMessages[0].recipient, fixture.user.email);
+    assert.match(confirmationMessages[0].bodyPreview, new RegExp(`Order ${checkout.order.id} is confirmed`));
+
     const duplicateResponse = await handleStripeWebhook(
       new Request("https://maca.example/api/webhooks/payments/stripe", {
         method: "POST",
@@ -232,6 +242,14 @@ test("Stripe checkout.completed webhook marks orders paid and grants access", as
     assert.equal(duplicateResponse.status, 200);
     const duplicateBody = await duplicateResponse.json();
     assert.equal(duplicateBody.duplicate, true);
+
+    const confirmationCountAfterDuplicate = await prisma.outboundMessage.count({
+      where: {
+        userId: fixture.user.id,
+        templateKey: "purchase_confirmation"
+      }
+    });
+    assert.equal(confirmationCountAfterDuplicate, 1);
   } finally {
     if (previousSecret === undefined) {
       delete process.env.STRIPE_WEBHOOK_SECRET;

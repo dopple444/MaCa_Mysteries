@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { queuePurchaseConfirmationMessage } from "./notifications";
 
 type HostGameAccessInput = {
   userId: string;
@@ -111,6 +112,8 @@ export async function fulfillPaidOrder(orderId: string) {
     });
     grantedAccessCount += 1;
   }
+
+  await queuePurchaseConfirmationMessage(order);
 
   return { grantedAccessCount };
 }

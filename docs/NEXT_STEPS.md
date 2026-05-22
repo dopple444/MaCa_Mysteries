@@ -31,8 +31,9 @@ Last inspected: 2026-05-22
 - Checkout-start creates pending orders and can redirect to Stripe when provider settings exist.
 - Stripe webhook route verifies signatures, records provider event IDs idempotently, marks paid orders, and grants game access.
 - Stripe test mode is configured locally and a sandbox checkout has completed successfully.
-- Stripe webhook forwarding is running through the local Stripe CLI and processed `checkout.session.completed`.
+- Stripe Dashboard webhook delivery is configured for public staging at `https://staging.macamysteries.com/api/webhooks/payments/stripe`; the old local Stripe CLI listener is stopped for staging.
 - Sandbox purchase fulfillment granted active access to Murder at Hollow Lake.
+- Paid order fulfillment now queues an idempotent purchase confirmation email through `OutboundMessage`.
 - Payment setup docs and config check scripts exist in `docs/PAYMENT_PROVIDER_SETUP.md` and `npm run payment:check`.
 - Admin payment maintenance can cancel stale pending orders and reconcile paid orders that are missing game access.
 - Payment checkout and Stripe webhook routes emit structured payment logs and mark failed checkout/webhook processing states.
@@ -61,7 +62,9 @@ Last inspected: 2026-05-22
 
 2. Run the live smoke suite after every server restart.
    - Keep `http://192.168.2.45:3001` reachable.
+   - Keep `https://staging.macamysteries.com` healthy through Cloudflare Tunnel.
    - Run `TEST_BASE_URL=http://127.0.0.1:3001 npm test`.
+   - Run `TEST_BASE_URL=https://staging.macamysteries.com npm test` after public staging changes.
    - Probe `/`, `/games`, `/support`, `/admin`, and one game detail route.
 
 3. Create a dedicated test database.
@@ -74,7 +77,7 @@ Last inspected: 2026-05-22
    - Status: implemented.
    - Stale pending orders older than 24 hours can be cancelled from Admin > Payment operations.
    - Paid orders can be reconciled from Admin > Payment operations or a specific admin order detail page.
-   - Restart steps for the app server and Stripe listener are documented in `docs/PAYMENT_PROVIDER_SETUP.md`.
+   - Restart steps for the staging app and Stripe Dashboard webhook setup are documented in `docs/PAYMENT_PROVIDER_SETUP.md`.
 
 5. Expand payment observability.
    - Status: partially implemented.
@@ -87,7 +90,8 @@ Last inspected: 2026-05-22
    - Console dry-run email delivery and Resend HTTP delivery are wired for queued `OutboundMessage` email records.
    - Production sender/domain setup and real API key configuration still need to be completed outside the codebase.
    - Before go-live, replace the temporary Gmail sender with a verified `MaCaMysteries.com` sender/domain and rerun the email checklist in `docs/EMAIL_PROVIDER_SETUP.md`.
-   - Next email templates: invitations, purchase confirmations, support notices, account verification, password reset, and reminders.
+   - Purchase confirmation emails are queued after paid fulfillment.
+   - Next email templates: polished invitations, support notices, account verification, password reset, reminders, and branded HTML/plain-text production versions.
 
 7. Add email verification and password reset.
    - Status: implemented foundation.

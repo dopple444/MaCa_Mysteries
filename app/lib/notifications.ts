@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { getOutboundProvider } from "./outbound-delivery";
+import { getOutboundProvider, queueEmailMessage } from "./outbound-delivery";
 
 type InvitationRecipient = {
   id?: string;
@@ -54,4 +54,58 @@ export async function queuePartyInvitationMessages(input: QueuePartyInvitationIn
   });
 
   return { queuedCount: recipients.length };
+}
+
+type PurchaseConfirmationOrder = {
+  id: string;
+  userId: string | null;
+  email: string;
+  totalCents: number;
+  currency: string;
+  items: Array<{
+    quantity: number;
+    product: {
+      name: string;
+    };
+  }>;
+};
+
+function formatOrderTotal(order: PurchaseConfirmationOrder) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: order.currency || "USD"
+  }).format(order.totalCents / 100);
+}
+
+export async function queuePurchaseConfirmationMessage(order: PurchaseConfirmationOrder) {
+  if (!order.userId || !order.email.includes("@")) return { queued: false, reason: "missing-recipient" as const };
+
+  const recipient = order.email.trim().toLowerCase();
+  const purchasedItems = order.items
+    .map((item) => `${item.quantity} x ${item.product.name}`)
+    .join(", ");
+  const bodyPreview = `Order ${order.id} is confirmed for ${formatOrderTotal(order)}. Access is ready for ${purchasedItems}.`;
+
+  const existing = await prisma.outboundMessage.findFirst({
+    where: {
+      userId: order.userId,
+      channel: "EMAIL",
+      recipient,
+      templateKey: "purchase_confirmation",
+      bodyPreview
+    },
+    select: { id: true }
+  });
+
+  if (existing) return { queued: false, reason: "already-queued" as const, messageId: existing.id };
+
+  const message = await queueEmailMessage({
+    userId: order.userId,
+    recipient,
+    templateKey: "purchase_confirmation",
+    subject: "Your MaCa Mysteries purchase is ready",
+    bodyPreview
+  });
+
+  return { queued: Boolean(message), reason: message ? "queued" as const : "invalid-recipient" as const, messageId: message?.id };
 }

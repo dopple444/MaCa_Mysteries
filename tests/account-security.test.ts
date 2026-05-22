@@ -9,6 +9,7 @@ import {
   verifyAccountActionToken,
   verifyUserEmail
 } from "../app/lib/account-security";
+import { getPostLoginRedirectPath } from "../app/lib/auth-flow";
 import { hashPassword, verifyPassword } from "../app/lib/auth";
 import { deleteCommerceFixture, prisma, uniqueTestLabel } from "./helpers/test-data";
 
@@ -61,6 +62,11 @@ test("email verification tokens verify users and mark email verified", async () 
   } finally {
     await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
   }
+});
+
+test("login redirects verified users to the dashboard and unverified users to email verification", () => {
+  assert.equal(getPostLoginRedirectPath({ emailVerifiedAt: new Date() }), "/dashboard");
+  assert.equal(getPostLoginRedirectPath({ emailVerifiedAt: null }), "/account/verify-email?sent=1");
 });
 
 test("password reset tokens queue email and become invalid after password reset", async () => {
