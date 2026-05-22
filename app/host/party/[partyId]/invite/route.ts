@@ -70,7 +70,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ par
     partyId,
     partyTitle: party.title,
     inviteCode: party.inviteCode,
-    guests: [guest]
+    guests: [guest],
+    isResend: true
   });
   await logAuditEvent({
     action: "party.invitation.resent",

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireUser } from "../../../lib/auth";
+import { getCsrfToken } from "../../../lib/csrf";
 import { prisma } from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ function formatActivityTime(date: Date) {
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const user = await requireUser();
   if (user.role !== "ADMIN") notFound();
+  const csrfToken = await getCsrfToken();
 
   const { orderId } = await params;
   const order = await prisma.order.findUnique({
@@ -137,7 +139,17 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </section>
 
         <section className="mt-8 rounded-3xl border border-white/10 bg-slate-950/80 p-6">
-          <h2 className="text-2xl font-semibold text-white">Access grants</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-2xl font-semibold text-white">Access grants</h2>
+            {order.status === "PAID" && (
+              <form action={`/admin/orders/${order.id}/reconcile`} method="post">
+                <input type="hidden" name="csrfToken" value={csrfToken} />
+                <button className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white">
+                  Reconcile access
+                </button>
+              </form>
+            )}
+          </div>
           <div className="mt-4 space-y-3">
             {accessGrants.length ? (
               accessGrants.map((grant) => (

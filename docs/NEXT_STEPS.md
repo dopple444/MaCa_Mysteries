@@ -1,6 +1,6 @@
 # Next Steps
 
-Last inspected: 2026-05-21
+Last inspected: 2026-05-22
 
 ## Current Baseline Completed
 
@@ -14,10 +14,17 @@ Last inspected: 2026-05-21
 - Accusation model, player accusation form, and host accusation results view.
 - Media asset model, seeded local placeholder media, host media inventory, and player-safe media display.
 - Host run-of-show summary and player status summary.
+- Join/play pages have a first mobile/accessibility pass for tighter phone spacing, explicit form labels, full-width mobile actions, and safer media sizing.
+- Game Builder Wizard and Conditional Reveal Engine foundations now exist for digital artifacts, character tools, unlock rules, player inventory, tool instances, code attempts, asset views, player interactions, and unlock events.
+- Admin game detail pages now include draft-only editors for digital artifacts, character tools, and unlock rules.
+- Admin builder preview pages can simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
+- Publish-readiness validation blocks unsafe game-version publishing when required content or conditional unlock wiring is incomplete.
+- Player-facing character tool inventory and access-code entry now exist on `/play` for locked evidence, cards, media, and digital artifacts.
+- Host party control now includes spoiler-safe conditional unlock activity counts, recent unlock events, and recent code attempts.
 - Party completion/reopen flow with `PartyResult` and completed-party mutation blocking.
 - Admin inventory with recent activity, orders, outbound messages, support queue, and content totals.
 - Admin game detail pages with game metadata editing, game-version status controls, and first-party game draft creation.
-- Admin support detail pages and support ticket status controls.
+- Admin support detail pages, support ticket status controls, reply history, queued reply emails, and internal notes.
 - Customer order/access history and admin order detail pages with items, access grants, and linked webhook events.
 - Admin payment observability includes order status filters, webhook status filters, and recent webhook event inventory.
 - Purchase gating service checks active products, development bypass, and `UserGameAccess`.
@@ -27,18 +34,23 @@ Last inspected: 2026-05-21
 - Stripe webhook forwarding is running through the local Stripe CLI and processed `checkout.session.completed`.
 - Sandbox purchase fulfillment granted active access to Murder at Hollow Lake.
 - Payment setup docs and config check scripts exist in `docs/PAYMENT_PROVIDER_SETUP.md` and `npm run payment:check`.
-- Invitation email drafts are queued in `OutboundMessage` when parties are created, guests are added, or invites are resent.
-- Outbound email/SMS provider helpers, queued email creation, sent/failed markers, and retry controls exist.
+- Admin payment maintenance can cancel stale pending orders and reconcile paid orders that are missing game access.
+- Payment checkout and Stripe webhook routes emit structured payment logs and mark failed checkout/webhook processing states.
+- Invitation email drafts are queued in `OutboundMessage` when parties are created, guests are added, or invites are resent, and guest records track invitation queued/sent/failed status.
+- Outbound email/SMS provider helpers, queued email creation, console/Resend email delivery, sent/failed markers, and retry controls exist.
+- Account email verification and password reset flows use signed links and queued email messages.
 - SMS preference model and account notification settings screen exist; real SMS sending remains disabled until a provider is chosen.
 - Support ticket intake stores requests in Postgres.
 - Audit log foundation covers host, player, admin content, support, invite, party status, and outbound retry mutations.
 - Database-backed rate limiting is wired into login, signup, join, support, and checkout-start.
 - CSRF tokens are wired into mutation forms and route handlers; production rejects missing/invalid tokens.
-- Object storage policy helpers and upload validation are in place before upload endpoints are enabled.
+- Object storage policy helpers, upload validation, and local admin media uploads are in place.
 - Docker production scaffolding and deployment/cutover notes exist.
-- Content workflow, spoiler review checklist, production recovery, security hardening, environment, and marketplace planning docs exist.
+- Content workflow, spoiler review checklist, account recovery, production recovery, security hardening, environment, and marketplace planning docs exist.
 - Shared test fixture helper foundation exists under `tests/helpers`.
-- Automated tests cover invite parsing, card/evidence/media visibility, access control, guest cookie behavior, assignment, round progression, evidence/final reveal, accusations, purchase gating, order fulfillment, rate limiting, support, storage validation, outbound delivery, payment checkout, and Stripe webhook handling.
+- Dedicated test database preparation exists through `npm run test:prepare`, and standard `npm test` uses the test database when `TEST_BASE_URL` is not set.
+- Automated tests cover invite parsing, invitation delivery state, card/evidence/media visibility, access control, guest cookie behavior, assignment, round progression, evidence/final reveal, accusations, purchase gating, order fulfillment, rate limiting, support replies/internal notes, storage validation/local upload writes, outbound delivery, payment checkout, Stripe webhook handling, admin character/round/card/evidence/media/builder editing, builder previews, and publish readiness.
+- Conditional reveal tests cover role-safe visibility, cross-player access-code unlocks that reveal locked content only to the intended player, player tool panel/code-entry behavior, admin validation for builder-authored tools/rules/artifacts, preview-as-host/character behavior, and publish blocking for unsafe unlock wiring.
 
 ## Next 20 Development Steps
 
@@ -53,29 +65,36 @@ Last inspected: 2026-05-21
    - Probe `/`, `/games`, `/support`, `/admin`, and one game detail route.
 
 3. Create a dedicated test database.
-   - Separate local development data from automated test data.
-   - Add a documented `DATABASE_URL_TEST`.
-   - Keep live-route tests able to target the dev server.
+   - Status: implemented.
+   - `npm run test:prepare` creates/migrates the test database.
+   - `npm test` uses `DATABASE_URL_TEST` or a derived `_test` database when `TEST_BASE_URL` is not set.
+   - `TEST_BASE_URL=http://127.0.0.1:3001 npm test` still uses the running app database so live route fixtures match the server.
 
 4. Clean up payment test operations.
-   - Add stale pending-order handling for abandoned Stripe sessions.
-   - Add admin reconcile tools for paid Stripe sessions that did not fulfill.
-   - Document how to restart the app server and Stripe listener together.
+   - Status: implemented.
+   - Stale pending orders older than 24 hours can be cancelled from Admin > Payment operations.
+   - Paid orders can be reconciled from Admin > Payment operations or a specific admin order detail page.
+   - Restart steps for the app server and Stripe listener are documented in `docs/PAYMENT_PROVIDER_SETUP.md`.
 
 5. Expand payment observability.
-   - Add structured logs for checkout/session/webhook failures.
+   - Status: partially implemented.
+   - Structured logs now cover checkout session creation/failure and Stripe webhook invalid/duplicate/completed/failed processing events.
    - Add alerts for stuck pending orders and failed webhook events.
-   - Add filters for abandoned sessions and repeated checkout attempts.
+   - Add deeper filters for abandoned sessions and repeated checkout attempts.
 
 6. Choose and implement the email provider.
-   - Pick Resend, Postmark, SendGrid, SES, or another transactional provider.
-   - Add a delivery adapter for queued `OutboundMessage` email records.
-   - Send invitations, purchase confirmations, support notices, and reminders.
+   - Status: partially implemented.
+   - Console dry-run email delivery and Resend HTTP delivery are wired for queued `OutboundMessage` email records.
+   - Production sender/domain setup and real API key configuration still need to be completed outside the codebase.
+   - Before go-live, replace the temporary Gmail sender with a verified `MaCaMysteries.com` sender/domain and rerun the email checklist in `docs/EMAIL_PROVIDER_SETUP.md`.
+   - Next email templates: invitations, purchase confirmations, support notices, account verification, password reset, and reminders.
 
 7. Add email verification and password reset.
-   - Add token tables or signed token flow.
-   - Send verification/reset emails through the provider adapter.
-   - Add support/admin recovery procedures.
+   - Status: implemented foundation.
+   - Signed account-action links support email verification and password reset.
+   - Verification/reset messages are queued as `OutboundMessage` emails for console/Resend delivery.
+   - Password reset revokes existing sessions and signs the user in with the new password.
+   - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`; admin recovery tooling still needs to be built before support staff handle real accounts.
 
 8. Choose and implement the SMS provider.
    - Pick Twilio or another provider.
@@ -83,53 +102,71 @@ Last inspected: 2026-05-21
    - Keep SMS disabled for any user without explicit opt-in.
 
 9. Build admin content editing for characters.
+   - Status: implemented foundation.
    - Create/edit character key, name, public bio, private bio, required/optional flag, and sort order.
    - Audit all edits.
    - Add validation for duplicate keys and required character coverage.
+   - Character editing is available on `/admin/games/[gameId]` for draft versions only; published versions are locked.
 
 10. Build admin content editing for rounds and cards.
+   - Status: implemented foundation.
    - Create/edit round definitions and player cards.
    - Enforce visibility values and round ordering.
    - Add spoiler labels for victim/killer/final reveal content.
+   - Round/card editing is available on `/admin/games/[gameId]` for draft versions only; published versions are locked.
 
 11. Build admin content editing for evidence and media metadata.
+   - Status: implemented foundation.
    - Create/edit evidence records and media metadata.
    - Validate visibility, round linkage, character linkage, and evidence type.
    - Keep binary upload separate until storage endpoints are ready.
+   - Evidence/media metadata editing is available on `/admin/games/[gameId]` for draft versions only; binary uploads remain separate.
 
 12. Add upload endpoints and storage integration.
+   - Status: implemented local foundation.
    - Implement local/S3-compatible storage behind the existing storage policy helpers.
    - Enforce MIME type, file size, and private/public path rules.
    - Add signed URL strategy before private media is used.
+   - Keep media assets compatible with conditional reveal rules, locked evidence, digital artifacts, and private player-only content.
+   - Admin uploads are available at `/admin/media/uploads`; public local files are served from `/uploads/media/...`, while private local files are stored outside `public/` and are not served until signed URLs exist.
 
 13. Build spoiler-safe host mode controls.
+   - Status: implemented foundation.
    - Keep default host view spoiler-safe.
    - Add explicit unlock flow for spoiler mode.
    - Audit spoiler unlock and require clear confirmation.
+   - Host party pages now hide spoiler-protected media and final solution details until the host explicitly unlocks spoiler mode; unlock state is stored on the party and audit logged.
 
 14. Improve invitation workflow.
-   - Add invitation status, last sent time, resend count, and failed delivery details.
-   - Let hosts resend failed invitations from party control.
+   - Status: implemented foundation.
+   - Guest records track invitation status, last queued time, last sent time, resend count, failed time, and failed delivery details.
+   - Host party control shows invitation delivery state per guest and keeps resend available, including failed invitations.
+   - Outbound delivery markers update guest invitation state when invitation emails are sent, failed, or retried.
    - Add reminder scheduling later.
 
 15. Improve player mobile usability.
-   - Test join/play/accusation/reveal on narrow mobile widths.
-   - Tighten clue, evidence, media, and round panels for phone use.
-   - Add accessibility pass for form labels, contrast, and focus states.
+   - Status: partially implemented.
+   - Join and player pages now use tighter mobile spacing, responsive heading sizes, explicit labels for form controls, full-width mobile action buttons, safer image containment, and break-word guards for long names/emails/titles.
+   - Manual real-device or browser viewport review is still needed for join/play/accusation/reveal before launch.
+   - Continue accessibility pass for contrast, focus states, and screen-reader flow as designs mature.
 
 16. Add support replies and internal notes.
-   - Add support-ticket message/history model.
-   - Send replies through email provider.
-   - Add internal-only admin notes and status history.
+   - Status: implemented foundation.
+   - Support tickets now have message history records.
+   - Admins can queue customer reply emails through `OutboundMessage`.
+   - Admins can add internal-only notes.
+   - Status changes, replies, and internal notes are audit logged.
+   - Dedicated SLA/status-history automation can be added later if support volume grows.
 
 17. Split admin roles.
    - Add roles for support, content editor, finance, and super admin.
    - Restrict payment, support, and spoiler-heavy content views by role.
    - Audit permission changes.
 
-18. Prepare production process and network layer.
+18. Prepare production process, network layer, and security gates.
    - Choose direct process manager versus Docker cutover.
    - Add reverse proxy, TLS, firewall, health checks, and restart policy.
+   - Keep CSRF protection, rate limiting, access control tests, host spoiler-safe mode, and player-safe content projections active as every new route is added.
    - Document the exact local Ubuntu to data-center path.
 
 19. Automate backups and restore drills.
@@ -139,4 +176,17 @@ Last inspected: 2026-05-21
 
 20. Keep marketplace work behind the first-party MVP.
    - Preserve creator profile, publishing approval, revenue split, payout, and review plans.
-   - Do not build creator selling flows until first-party purchase, hosting, play, support, and operations are stable.
+   - Do not build creator selling flows until first-party purchase, hosting, play, support, operations, the internal Game Builder, and the Conditional Reveal Engine are stable.
+
+21. Build the internal Game Builder Wizard and Conditional Reveal Engine.
+   - Status: implemented foundation with draft-only admin editors, admin preview pages, publish-readiness checks, and the first player-facing access-code unlock path for evidence/cards/media/digital artifacts.
+   - Schema now supports digital artifacts, character tools, unlock rules, tool instances, unlock events, code attempts, asset views, player interactions, and player inventory.
+   - Existing cards, evidence, and media can reference a required unlock rule.
+   - Player-safe content helpers now hide conditionally locked cards/evidence/media until the player has the required unlock event.
+   - `/play` now shows character-specific access-code generator tools, prompts players for locked evidence/card/media/artifact codes when applicable, and posts unlock attempts through a CSRF-protected, rate-limited route.
+   - Host party pages now show sanitized conditional unlock activity without exposing raw codes or spoiler-sensitive rule titles unless host spoiler mode is unlocked.
+   - Admin game detail pages can create/update draft digital artifacts, character tools, and unlock rules.
+   - Builder editor services validate draft locks, duplicate keys, version-owned linkages, player-private character requirements, valid rule targets, and access-code source tools.
+   - Builder preview pages simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
+   - Publishing now checks required content, final reveal presence, version-owned linkages, orphan required unlocks, unpublished required rules, unattached published rules, and access-code generator requirements.
+   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, admin/global monitoring of code attempts, and deeper readiness checks for circular dependencies and spoiler wording.

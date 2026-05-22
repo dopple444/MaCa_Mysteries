@@ -1,17 +1,20 @@
 # Database Model Draft
 
-Last inspected: 2026-05-17
+Last inspected: 2026-05-21
 
 ## Purpose
 
 This is a first-draft PostgreSQL/Prisma-oriented data model for the self-hosted MaCa Mysteries platform. It extends far beyond the current Prisma schema.
 
-Current implemented Prisma models:
+Current implemented Prisma models now cover the first-party MVP plus the Game Builder / Conditional Reveal foundation:
 
-- `User`
-- `UserSession`
-- `Party`
-- `Guest`
+- Auth and accounts: `User`, `UserSession`
+- Commerce: `Product`, `Order`, `OrderItem`, `UserGameAccess`, `PaymentWebhookEvent`
+- Game content: `Game`, `GameVersion`, `GameCharacter`, `GameRound`, `GameCard`, `GameEvidence`, `GameMediaAsset`, `GameFinalReveal`
+- Builder/conditional content: `GameDigitalArtifact`, `GameCharacterTool`, `GameUnlockRule`
+- Party runtime: `Party`, `Guest`, `PartyCharacterAssignment`, `PartyRoundState`, `PartyEvidenceReveal`, `PartyFinalRevealState`, `PartyAccusation`, `PartyResult`
+- Conditional runtime: `PartyToolInstance`, `PartyUnlockEvent`, `PartyCodeAttempt`, `PartyAssetView`, `PartyPlayerInteraction`, `PartyPlayerInventory`
+- Operations: `OutboundMessage`, `SupportTicket`, `SupportTicketMessage`, `AuditLog`, `RateLimitBucket`
 
 Target models below use snake_case table names because the requested documentation names them that way. Prisma model names can be PascalCase with `@@map()` if desired.
 
@@ -47,8 +50,8 @@ Suggested fields:
 
 Notes:
 
-- Current schema has `User.id`, `email`, `name`, `role`, `passwordHash`, timestamps.
-- Add user status and email verification before production.
+- Current schema has `User.id`, `email`, `emailVerifiedAt`, `name`, `role`, `passwordHash`, phone/preference fields, and timestamps.
+- Add user status before production.
 
 ### accounts
 
@@ -207,6 +210,7 @@ Suggested fields:
 - `things_to_reveal`
 - `things_to_conceal`
 - `visibility`
+- `required_unlock_rule_id`
 - `unlock_policy`
 - `sort_order`
 - `created_at`
@@ -228,6 +232,7 @@ Suggested fields:
 - `body`
 - `media_asset_id`
 - `visibility`
+- `required_unlock_rule_id`
 - `unlock_policy`
 - `revealed_by_default`
 - `sort_order`
@@ -253,6 +258,7 @@ Suggested fields:
 - `alt_text`
 - `caption`
 - `visibility`
+- `required_unlock_rule_id`
 - `checksum`
 - `created_by_user_id`
 - `created_at`
@@ -311,6 +317,81 @@ Suggested fields:
 - `unlock_round_id`
 - `requires_host_spoiler_mode`
 - `requires_assignment_character_id`
+- `created_at`
+- `updated_at`
+
+### game_digital_artifacts
+
+Structured builder-authored artifacts such as fake emails, fake text messages, investigation sheets, restricted folders, decoder payloads, or inventory-style clues.
+
+Current Prisma name: `GameDigitalArtifact`.
+
+Suggested fields:
+
+- `id`
+- `game_version_id`
+- `game_round_id`
+- `character_id`
+- `evidence_id`
+- `media_asset_id`
+- `key`
+- `title`
+- `description`
+- `artifact_type`
+- `visibility`
+- `required_unlock_rule_id`
+- `content`
+- `sort_order`
+- `created_at`
+- `updated_at`
+
+### game_character_tools
+
+Character-specific digital tools such as keys, decoders, scanners, access-code generators, or investigation aids.
+
+Current Prisma name: `GameCharacterTool`.
+
+Suggested fields:
+
+- `id`
+- `game_version_id`
+- `character_id`
+- `key`
+- `title`
+- `description`
+- `tool_type`
+- `visibility`
+- `config`
+- `sort_order`
+- `created_at`
+- `updated_at`
+
+### game_unlock_rules
+
+Rules that describe when and how locked content becomes available.
+
+Current Prisma name: `GameUnlockRule`.
+
+Suggested fields:
+
+- `id`
+- `game_version_id`
+- `required_round_id`
+- `required_character_id`
+- `source_tool_id`
+- `key`
+- `title`
+- `description`
+- `rule_type`
+- `trigger_type`
+- `target_type`
+- `target_id`
+- `unlock_scope`
+- `code_mode`
+- `config`
+- `effect`
+- `status`
+- `sort_order`
 - `created_at`
 - `updated_at`
 
@@ -449,6 +530,12 @@ Suggested fields:
 - `invite_token_hash`
 - `guest_session_token_hash`
 - `status`
+- `invitation_status`
+- `invitation_last_queued_at`
+- `invitation_last_sent_at`
+- `invitation_resend_count`
+- `invitation_failed_at`
+- `invitation_failure_detail`
 - `invited_at`
 - `joined_at`
 - `last_seen_at`
@@ -457,7 +544,43 @@ Suggested fields:
 
 Current equivalent:
 
-- `Guest`
+- `Guest`, including invitation status, queued/sent timestamps, resend count, and failed delivery detail.
+
+### party_tool_instances
+
+Party-specific instances of character tools, including one-time or limited-use code generators.
+
+Current Prisma name: `PartyToolInstance`.
+
+### party_unlock_events
+
+Successful unlock history. Used by player-safe content filters.
+
+Current Prisma name: `PartyUnlockEvent`.
+
+### party_code_attempts
+
+Access-code attempt history. Raw codes should not be stored; the current foundation stores salted hashes.
+
+Current Prisma name: `PartyCodeAttempt`.
+
+### party_asset_views
+
+Asset/content view history for rules such as "unlock after another clue has been viewed."
+
+Current Prisma name: `PartyAssetView`.
+
+### party_player_interactions
+
+Cross-player interaction history for rules requiring collaboration.
+
+Current Prisma name: `PartyPlayerInteraction`.
+
+### party_player_inventory
+
+Per-player inventory state for digital keys, tools, clues, and artifacts.
+
+Current Prisma name: `PartyPlayerInventory`.
 
 ### party_character_assignments
 
@@ -605,6 +728,22 @@ Suggested fields:
 - `assigned_to_user_id`
 - `created_at`
 - `updated_at`
+
+### support_ticket_messages
+
+Threaded support history for customer messages, admin replies, and internal notes.
+
+Current Prisma name: `SupportTicketMessage`.
+
+Suggested fields:
+
+- `id`
+- `ticket_id`
+- `author_user_id`
+- `message_type`
+- `body`
+- `outbound_message_id`
+- `created_at`
 
 ### audit_log
 
@@ -774,9 +913,14 @@ Useful enums for Prisma:
 - `GameOwnershipType`: `FIRST_PARTY`, `CREATOR`
 - `GameVersionStatus`: `DRAFT`, `REVIEW`, `PUBLISHED`, `RETIRED`, `ARCHIVED`
 - `Visibility`: `PUBLIC`, `HOST_SAFE`, `HOST_SPOILER`, `PLAYER_PRIVATE`, `ROUND_UNLOCKED`, `ADMIN_ONLY`
+- `BuilderArtifactType`: `DOCUMENT`, `EMAIL`, `MESSAGE`, `IMAGE`, `AUDIO`, `VIDEO`, `INVESTIGATION_SHEET`, `INVENTORY_ITEM`, `TOOL_PAYLOAD`
+- `CharacterToolType`: `GENERIC`, `ACCESS_CODE_GENERATOR`, `DECODER`, `KEY`, `SCANNER`, `NOTEBOOK`
+- `UnlockRuleType`: `MANUAL`, `ACCESS_CODE`, `ASSET_VIEWED`, `PLAYER_INTERACTION`, `HOST_APPROVAL`, `ROUND_STATE`, `REVEAL_STATE`
+- `UnlockScope`: `PLAYER`, `ALL_PLAYERS`, `HOST`, `HOST_AND_PLAYERS`, `PARTY`
 - `PartyStatus`: `DRAFT`, `INVITING`, `ASSIGNING_CHARACTERS`, `READY`, `IN_PROGRESS`, `PAUSED`, `FINAL_REVEAL_UNLOCKED`, `COMPLETE`, `CANCELLED`
 - `RoundState`: `LOCKED`, `AVAILABLE_TO_HOST`, `OPEN_TO_PLAYERS`, `PAUSED`, `COMPLETE`
 - `GuestStatus`: `INVITED`, `JOINED`, `DECLINED`, `REMOVED`
+- `InvitationStatus`: `NOT_SENT`, `QUEUED`, `SENT`, `FAILED`
 - `AssignmentStatus`: `ACTIVE`, `REPLACED`, `REMOVED`
 - `OrderStatus`: `PENDING`, `PAID`, `FAILED`, `REFUNDED`, `CANCELLED`
 - `SupportTicketStatus`: `OPEN`, `WAITING_ON_CUSTOMER`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`
@@ -789,11 +933,13 @@ Current Prisma names intentionally use PascalCase model names and map naturally 
 - `Game`, `GameVersion`, `GameCharacter`, `GameRound`, `GameCard`, `GameEvidence`, `GameMediaAsset`, `GameFinalReveal`
 - `Product`, `Order`, `OrderItem`, `UserGameAccess`, `PaymentWebhookEvent`
 - `Party`, `Guest`, `PartyCharacterAssignment`, `PartyRoundState`, `PartyEvidenceReveal`, `PartyFinalRevealState`, `PartyAccusation`, `PartyResult`
-- `OutboundMessage`, `SupportTicket`, `AuditLog`, `RateLimitBucket`
+- `GameDigitalArtifact`, `GameCharacterTool`, `GameUnlockRule`
+- `PartyToolInstance`, `PartyUnlockEvent`, `PartyCodeAttempt`, `PartyAssetView`, `PartyPlayerInteraction`, `PartyPlayerInventory`
+- `OutboundMessage`, `SupportTicket`, `SupportTicketMessage`, `AuditLog`, `RateLimitBucket`
 
 Near-term strategy:
 
 1. Keep published `GameVersion` records immutable.
-2. Add editor-specific validation before expanding admin create/edit screens.
-3. Add a dedicated test database before production.
+2. Keep publish-readiness validation in the publish path as builder entities expand.
+3. Continue expanding tests against the dedicated test database before production.
 4. Avoid destructive renames until backup/restore drills and migration scripts are proven.

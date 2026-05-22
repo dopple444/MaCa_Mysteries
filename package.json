@@ -7,19 +7,21 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "tsx scripts/run-tests.ts",
+    "test:raw": "node --import tsx --test tests/*.test.ts",
+    "test:prepare": "tsx scripts/prepare-test-database.ts",
     "prisma:seed": "tsx prisma/seed.ts",
     "payment:check": "tsx scripts/check-payment-config.ts",
     "stripe:login": "./tools/stripe/stripe login",
     "stripe:listen": "./tools/stripe/stripe listen --forward-to http://127.0.0.1:3001/api/webhooks/payments/stripe --events checkout.session.completed"
   },
   "dependencies": {
-    "next": "^15.0.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "@prisma/client": "^5.22.0",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "next": "^15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

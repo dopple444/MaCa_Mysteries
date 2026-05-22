@@ -5,3 +5,5 @@ out
 .env
 tsconfig.tsbuildinfo
 tools/stripe/
+public/uploads/
+storage/

@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { logAuditEvent } from "../../../../../../lib/audit-log";
+import { updateGameVersionStatus } from "../../../../../../lib/admin-version-status";
 import { getCurrentUser } from "../../../../../../lib/auth";
 import { verifyCsrfToken } from "../../../../../../lib/csrf";
-import { prisma } from "../../../../../../lib/prisma";
-
-const ALLOWED_STATUSES = new Set(["DRAFT", "PUBLISHED"]);
 
 function getFormValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -35,57 +32,16 @@ export async function POST(
   if (!(await verifyCsrfToken(formData))) {
     return redirectToGame(request, gameId);
   }
-  const status = getFormValue(formData, "status").toUpperCase();
-
-  if (!ALLOWED_STATUSES.has(status)) {
-    return redirectToGame(request, gameId);
-  }
-
-  const version = await prisma.gameVersion.findFirst({
-    where: {
-      id: versionId,
-      gameId
-    },
-    select: {
-      id: true,
-      status: true,
-      finalReveal: {
-        select: { id: true }
-      },
-      _count: {
-        select: {
-          characters: true,
-          rounds: true
-        }
-      }
-    }
-  });
-
-  if (!version) {
-    return redirectToGame(request, gameId);
-  }
-
-  if (status === "PUBLISHED" && (!version.finalReveal || version._count.characters === 0 || version._count.rounds === 0)) {
-    return redirectToGame(request, gameId, "incomplete-version");
-  }
-
-  await prisma.gameVersion.update({
-    where: { id: versionId },
-    data: {
-      status,
-      publishedAt: status === "PUBLISHED" ? new Date() : null
-    }
-  });
-  await logAuditEvent({
-    action: "admin.gameVersion.statusChanged",
+  const result = await updateGameVersionStatus({
+    gameId,
+    versionId,
     userId: user.id,
-    entityType: "GameVersion",
-    entityId: versionId,
-    metadata: {
-      previousStatus: version.status,
-      status
-    }
+    status: getFormValue(formData, "status")
   });
+
+  if (!result.ok) {
+    return redirectToGame(request, gameId, result.reason === "publish-readiness" ? "publish-readiness" : undefined);
+  }
 
   return redirectToGame(request, gameId);
 }

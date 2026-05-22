@@ -1,6 +1,6 @@
 # Migration Plan
 
-Last inspected: 2026-05-17
+Last inspected: 2026-05-21
 
 ## Current Reality Check
 
@@ -224,7 +224,7 @@ Completion criteria:
 
 Goal:
 
-- Control what each user can see based on party, round, assignment, and spoiler mode.
+- Control what each user can see based on party, round, assignment, spoiler mode, and conditional unlock state.
 
 Deliverables:
 
@@ -234,15 +234,19 @@ Deliverables:
 - Explicit host spoiler unlock with audit log.
 - Player content projection service.
 - Final reveal gating.
+- Conditional visibility service for cards, evidence, media, and future digital artifacts.
+- Unlock-event projection for player-safe reads.
 
 Files likely affected:
 
 - `prisma/schema.prisma`
 - `app/host/party/[partyId]/**`
 - `app/play/**`
-- `app/lib/services/round-engine.ts`
-- `app/lib/services/spoiler-policy.ts`
-- `app/lib/services/audit.ts`
+- `app/lib/player-cards.ts`
+- `app/lib/player-evidence.ts`
+- `app/lib/player-media.ts`
+- `app/lib/conditional-unlocks.ts`
+- `app/lib/audit-log.ts`
 
 Risks:
 
@@ -256,12 +260,13 @@ Completion criteria:
 - Host safe mode hides solution/victim/killer content by default.
 - Spoiler unlock is explicit and logged.
 - Round state controls are persisted.
+- Conditional locked content stays hidden until an authorized unlock event exists.
 
 ## Phase 8: Build Media-Rich Gameplay Experience
 
 Goal:
 
-- Support immersive clues and evidence using images, video, audio, documents, fake messages, and fake emails.
+- Support immersive clues and evidence using images, video, audio, documents, fake messages, fake emails, digital artifacts, and locked evidence.
 
 Deliverables:
 
@@ -271,11 +276,14 @@ Deliverables:
 - Evidence reveal workflow.
 - Message-style clue components.
 - Accessibility metadata for assets.
+- Digital artifact model for documents, fake emails, fake text messages, investigation sheets, restricted folders, and inventory-style clues.
+- Character tool model for keys, decoders, scanners, access-code generators, and other player-specific mechanics.
 
 Files likely affected:
 
 - `prisma/schema.prisma`
 - `app/lib/services/media.ts`
+- `app/lib/conditional-unlocks.ts`
 - `app/api/media/**`
 - `app/play/**`
 - `app/host/party/[partyId]/**`
@@ -293,12 +301,13 @@ Completion criteria:
 - Players can view/hear only unlocked media.
 - Hosts can reveal evidence intentionally.
 - Media is stored outside the database.
+- Locked evidence and media can depend on explicit unlock rules without leaking through player-safe views.
 
-## Phase 9: Build Admin Game Editor
+## Phase 9: Build Internal Game Builder And Admin Game Editor
 
 Goal:
 
-- Let internal admins create, edit, version, preview, and publish first-party games.
+- Let internal admins create, edit, version, preview, validate, and publish first-party games through a path that can later become the Game Builder Wizard.
 
 Deliverables:
 
@@ -308,12 +317,18 @@ Deliverables:
 - Spoiler preview tools.
 - Validation for missing required content.
 - Publish/retire controls.
+- Editors for digital artifacts, character tools, and unlock rules.
+- Preview as host-safe host, spoiler host, and specific assigned character.
+- Conditional reveal validation for unresolved targets, orphan rules, required unlock linkage, missing access-code generators, impossible unlocks, and unsafe spoiler labels.
 
 Files likely affected:
 
 - `app/admin/**`
-- `app/lib/services/admin-games.ts`
-- `app/lib/services/publishing.ts`
+- `app/lib/admin-characters.ts`
+- `app/lib/admin-rounds.ts`
+- `app/lib/admin-evidence.ts`
+- `app/lib/conditional-unlocks.ts`
+- `app/lib/publishing.ts`
 - `prisma/schema.prisma`
 
 Risks:
@@ -321,12 +336,25 @@ Risks:
 - Editor complexity can slow MVP if built too early.
 - Invalid content can break live parties.
 - Admin preview must distinguish player, host-safe, and spoiler views.
+- Conditional rules can create impossible content paths if validation is weak.
+- Creator-ready abstractions can add complexity before first-party editing is stable.
 
 Completion criteria:
 
 - Admin can create a draft game version.
 - Admin can validate and publish a version.
 - Published versions are immutable for existing parties.
+- Admin can author and inspect conditional reveal mechanics in draft versions.
+- Preview helpers prove that locked content is visible only to the intended actor/state.
+
+Current foundation implemented:
+
+- `GameDigitalArtifact`, `GameCharacterTool`, `GameUnlockRule`, `PartyToolInstance`, `PartyUnlockEvent`, `PartyCodeAttempt`, `PartyAssetView`, `PartyPlayerInteraction`, and `PartyPlayerInventory` exist.
+- `GameCard`, `GameEvidence`, and `GameMediaAsset` can reference `requiredUnlockRuleId`.
+- Player-safe card/evidence/media services honor conditional unlock state.
+- Admin game detail pages inspect builder-foundation counts and unlock-rule summaries.
+- Admin game detail pages show publish-readiness errors/warnings, and the publish route blocks versions with readiness errors.
+- Tests cover role visibility separation, cross-player access-code unlock behavior, builder preview behavior, and publish-readiness blocking.
 
 ## Phase 10: Prepare Payment/Email/SMS Integrations
 
@@ -412,6 +440,7 @@ Completion criteria:
 Goal:
 
 - Allow approved third-party creators to publish and sell games.
+- Do not enable outside creators until the internal Game Builder Wizard, conditional reveal engine, first-party commerce, support, security, and production operations are stable.
 
 Deliverables:
 
@@ -419,8 +448,7 @@ Deliverables:
 - Creator game ownership.
 - Publishing approval workflow.
 - Marketplace reviews.
-- Revenue splits.
-- Creator payouts.
+- Revenue split and payout planning.
 - Content moderation tools.
 
 Files likely affected:
@@ -438,10 +466,11 @@ Risks:
 - Quality control and moderation load.
 - Spoiler and IP protection.
 - Marketplace scale changes support expectations.
+- Creator-authored conditional rules increase validation and support burden.
 
 Completion criteria:
 
 - Creator can submit game for review.
 - Admin can approve/reject.
 - Approved games can be sold.
-- Revenue shares and payouts are tracked.
+- Revenue shares and payouts are tracked only after the marketplace payment/payout plan is intentionally implemented.

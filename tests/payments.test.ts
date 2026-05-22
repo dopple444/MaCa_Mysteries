@@ -110,10 +110,52 @@ test("createPaymentCheckoutSession creates a Stripe checkout session when config
     assert.equal(checkoutBody.get("client_reference_id"), checkout.order.id);
     assert.equal(checkoutBody.get("metadata[orderId]"), checkout.order.id);
     assert.equal(checkoutBody.get("line_items[0][price_data][unit_amount]"), "4900");
+    assert.equal(
+      checkoutBody.get("success_url"),
+      `https://maca.example/host/create?game=${fixture.slug}&checkout=success`
+    );
+    assert.equal(checkoutBody.get("cancel_url"), `https://maca.example/games/${fixture.slug}?checkout=cancelled`);
 
     const order = await prisma.order.findUniqueOrThrow({ where: { id: checkout.order.id } });
     assert.equal(order.paymentProvider, "stripe");
     assert.equal(order.paymentReference, "cs_test_123");
+  } finally {
+    await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
+  }
+});
+
+test("createPaymentCheckoutSession marks checkout failures on the order", async () => {
+  const fixture = await createPaymentFixture();
+
+  try {
+    const checkout = await createPendingOrderForProduct({
+      productId: fixture.product.id,
+      userId: fixture.user.id,
+      email: fixture.user.email
+    });
+    assert.ok(checkout);
+
+    const result = await createPaymentCheckoutSession({
+      order: checkout.order,
+      product: checkout.product,
+      requestUrl: "https://maca.example/games/test",
+      env: {
+        PAYMENT_PROVIDER: "stripe",
+        STRIPE_SECRET_KEY: "sk_test_123",
+        APP_URL: "https://maca.example"
+      },
+      fetcher: async () => ({
+        ok: false,
+        status: 400,
+        json: async () => ({}),
+        text: async () => "checkout failed"
+      })
+    });
+
+    assert.equal(result.status, "FAILED");
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: checkout.order.id } });
+    assert.equal(order.status, "FAILED");
+    assert.equal(order.paymentProvider, "stripe");
   } finally {
     await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
   }

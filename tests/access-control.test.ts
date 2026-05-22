@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 
 import { PrismaClient } from "@prisma/client";
@@ -76,13 +78,22 @@ async function deleteTestData(slugPrefix: string, emailDomain: string) {
       ]
     }
   });
-  await prisma.supportTicket.deleteMany({
+  const supportTickets = await prisma.supportTicket.findMany({
     where: {
       OR: [
         { email: { endsWith: emailDomain } },
         { userId: { in: userIds.length ? userIds : ["__none__"] } }
       ]
-    }
+    },
+    select: { id: true }
+  });
+  const supportTicketIds = supportTickets.map((ticket) => ticket.id);
+
+  await prisma.supportTicketMessage.deleteMany({
+    where: { ticketId: { in: supportTicketIds.length ? supportTicketIds : ["__none__"] } }
+  });
+  await prisma.supportTicket.deleteMany({
+    where: { id: { in: supportTicketIds.length ? supportTicketIds : ["__none__"] } }
   });
   await prisma.outboundMessage.deleteMany({
     where: {
@@ -115,6 +126,24 @@ async function deleteTestData(slugPrefix: string, emailDomain: string) {
       ]
     }
   });
+  await prisma.partyCodeAttempt.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
+  await prisma.partyUnlockEvent.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
+  await prisma.partyAssetView.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
+  await prisma.partyPlayerInteraction.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
+  await prisma.partyPlayerInventory.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
+  await prisma.partyToolInstance.deleteMany({
+    where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
+  });
   await prisma.partyCharacterAssignment.deleteMany({
     where: { partyId: { in: partyIds.length ? partyIds : ["__none__"] } }
   });
@@ -141,6 +170,15 @@ async function deleteTestData(slugPrefix: string, emailDomain: string) {
   });
   await prisma.gameCard.deleteMany({
     where: { gameRoundId: { in: roundIds.length ? roundIds : ["__none__"] } }
+  });
+  await prisma.gameDigitalArtifact.deleteMany({
+    where: { gameVersionId: { in: versionIds.length ? versionIds : ["__none__"] } }
+  });
+  await prisma.gameUnlockRule.deleteMany({
+    where: { gameVersionId: { in: versionIds.length ? versionIds : ["__none__"] } }
+  });
+  await prisma.gameCharacterTool.deleteMany({
+    where: { gameVersionId: { in: versionIds.length ? versionIds : ["__none__"] } }
   });
   await prisma.gameMediaAsset.deleteMany({
     where: { gameVersionId: { in: versionIds.length ? versionIds : ["__none__"] } }
@@ -388,6 +426,7 @@ async function createAccessFixture() {
     invitedGuestId: invitedGuest.id,
     pendingGuestId: pendingGuest.id,
     characterId: character.id,
+    roundId: round.id,
     previousRoundStateId: previousRoundState.id,
     roundStateId: revealRoundState.id,
     evidenceId: evidence.id
@@ -490,12 +529,78 @@ test(
         redirect: "manual"
       });
       assert.equal(ownerPartyResponse.status, 200);
+      const ownerPartyHtml = await ownerPartyResponse.text();
+      assert.match(ownerPartyHtml, /Host spoiler mode/);
+      assert.doesNotMatch(ownerPartyHtml, /Access solution/);
 
       const otherHostPartyResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}`, {
         headers: { cookie: sessionCookie(fixture.otherHostToken) },
         redirect: "manual"
       });
       assert.equal(otherHostPartyResponse.status, 404);
+
+      const deniedSpoilerModeResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}/spoiler-mode`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.otherHostToken)
+        },
+        body: new URLSearchParams({
+          confirmSpoilerMode: "on"
+        }),
+        redirect: "manual"
+      });
+      assert.equal(deniedSpoilerModeResponse.status, 303);
+      assert.equal(locationPath(deniedSpoilerModeResponse.headers.get("location")), "/dashboard");
+
+      const unconfirmedSpoilerModeResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}/spoiler-mode`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.ownerToken)
+        },
+        body: new URLSearchParams({}),
+        redirect: "manual"
+      });
+      assert.equal(unconfirmedSpoilerModeResponse.status, 303);
+      assert.equal(
+        locationPath(unconfirmedSpoilerModeResponse.headers.get("location")),
+        `/host/party/${fixture.partyId}`
+      );
+      const partyAfterUnconfirmedSpoilerPost = await prisma.party.findUniqueOrThrow({
+        where: { id: fixture.partyId },
+        select: { hostSpoilerUnlockedAt: true }
+      });
+      assert.equal(partyAfterUnconfirmedSpoilerPost.hostSpoilerUnlockedAt, null);
+
+      const ownerSpoilerModeResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}/spoiler-mode`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.ownerToken)
+        },
+        body: new URLSearchParams({
+          confirmSpoilerMode: "on"
+        }),
+        redirect: "manual"
+      });
+      assert.equal(ownerSpoilerModeResponse.status, 303);
+      assert.equal(locationPath(ownerSpoilerModeResponse.headers.get("location")), `/host/party/${fixture.partyId}`);
+
+      const partyAfterSpoilerPost = await prisma.party.findUniqueOrThrow({
+        where: { id: fixture.partyId },
+        select: { hostSpoilerUnlockedAt: true, hostSpoilerUnlockedByUserId: true }
+      });
+      assert.ok(partyAfterSpoilerPost.hostSpoilerUnlockedAt);
+      assert.equal(partyAfterSpoilerPost.hostSpoilerUnlockedByUserId, fixture.ownerId);
+
+      const spoilerUnlockedPartyResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}`, {
+        headers: { cookie: sessionCookie(fixture.ownerToken) }
+      });
+      assert.equal(spoilerUnlockedPartyResponse.status, 200);
+      const spoilerUnlockedPartyHtml = await spoilerUnlockedPartyResponse.text();
+      assert.match(spoilerUnlockedPartyHtml, /Spoilers unlocked/);
+      assert.match(spoilerUnlockedPartyHtml, /Access solution/);
 
       const deniedAssignmentResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}/assign`, {
         method: "POST",
@@ -691,6 +796,19 @@ test(
         }
       });
       assert.equal(inviteMessagesAfterResend, inviteMessagesBeforeResend + 1);
+      const invitedGuestAfterResend = await prisma.guest.findUniqueOrThrow({
+        where: { id: fixture.invitedGuestId },
+        select: {
+          invitationStatus: true,
+          invitationLastQueuedAt: true,
+          invitationResendCount: true,
+          invitationFailureDetail: true
+        }
+      });
+      assert.equal(invitedGuestAfterResend.invitationStatus, "QUEUED");
+      assert.ok(invitedGuestAfterResend.invitationLastQueuedAt);
+      assert.equal(invitedGuestAfterResend.invitationResendCount, 1);
+      assert.equal(invitedGuestAfterResend.invitationFailureDetail, "");
 
       const deniedRoundResponse = await fetch(`${appUrl}/host/party/${fixture.partyId}/round`, {
         method: "POST",
@@ -1139,13 +1257,92 @@ test(
         redirect: "manual"
       });
       assert.equal(adminSupportStatusResponse.status, 303);
-      assert.equal(locationPath(adminSupportStatusResponse.headers.get("location")), "/admin");
+      assert.equal(
+        locationPath(adminSupportStatusResponse.headers.get("location")),
+        `/admin/support/${supportTicket.id}`
+      );
 
       const supportTicketAfterAdminPost = await prisma.supportTicket.findUniqueOrThrow({
         where: { id: supportTicket.id },
         select: { status: true }
       });
       assert.equal(supportTicketAfterAdminPost.status, "PENDING");
+
+      const deniedSupportMessageResponse = await fetch(`${appUrl}/admin/support/${supportTicket.id}/message`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.otherHostToken)
+        },
+        body: new URLSearchParams({
+          messageType: "INTERNAL_NOTE",
+          body: "Denied note."
+        }),
+        redirect: "manual"
+      });
+      assert.equal(deniedSupportMessageResponse.status, 303);
+      assert.equal(locationPath(deniedSupportMessageResponse.headers.get("location")), "/dashboard");
+
+      const adminSupportNoteResponse = await fetch(`${appUrl}/admin/support/${supportTicket.id}/message`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.adminToken)
+        },
+        body: new URLSearchParams({
+          messageType: "INTERNAL_NOTE",
+          body: "Internal access-control note."
+        }),
+        redirect: "manual"
+      });
+      assert.equal(adminSupportNoteResponse.status, 303);
+      assert.equal(
+        locationPath(adminSupportNoteResponse.headers.get("location")),
+        `/admin/support/${supportTicket.id}`
+      );
+
+      const adminSupportReplyResponse = await fetch(`${appUrl}/admin/support/${supportTicket.id}/message`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(fixture.adminToken)
+        },
+        body: new URLSearchParams({
+          messageType: "CUSTOMER_REPLY",
+          body: "Customer-facing access-control reply."
+        }),
+        redirect: "manual"
+      });
+      assert.equal(adminSupportReplyResponse.status, 303);
+      assert.equal(
+        locationPath(adminSupportReplyResponse.headers.get("location")),
+        `/admin/support/${supportTicket.id}`
+      );
+
+      const supportMessages = await prisma.supportTicketMessage.findMany({
+        where: { ticketId: supportTicket.id },
+        orderBy: { createdAt: "asc" },
+        select: {
+          messageType: true,
+          body: true,
+          outboundMessageId: true
+        }
+      });
+      assert.deepEqual(
+        supportMessages.map((message) => ({ messageType: message.messageType, body: message.body })),
+        [
+          { messageType: "INTERNAL_NOTE", body: "Internal access-control note." },
+          { messageType: "CUSTOMER_REPLY", body: "Customer-facing access-control reply." }
+        ]
+      );
+      assert.ok(supportMessages[1]?.outboundMessageId);
+      const supportReplyOutboundCount = await prisma.outboundMessage.count({
+        where: {
+          recipient: `support${fixture.emailDomain}`,
+          templateKey: "support_reply"
+        }
+      });
+      assert.equal(supportReplyOutboundCount, 1);
 
       const deniedVersionStatusResponse = await fetch(
         `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/status`,
@@ -1188,6 +1385,533 @@ test(
       assert.equal(draftVersion.status, "DRAFT");
       assert.equal(draftVersion.publishedAt, null);
 
+      const deniedCharacterResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/characters`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.otherHostToken)
+          },
+          body: new URLSearchParams({
+            key: "denied-character",
+            name: "Denied Character",
+            publicBio: "Denied character edit.",
+            privateBio: "",
+            sortOrder: "2",
+            isRequired: "on"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(deniedCharacterResponse.status, 303);
+      assert.equal(locationPath(deniedCharacterResponse.headers.get("location")), "/dashboard");
+
+      const adminCharacterCreateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/characters`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            key: "additional-suspect",
+            name: "Additional Suspect",
+            publicBio: "Added by access-control tests.",
+            privateBio: "Private addition from access-control tests.",
+            sortOrder: "2",
+            isRequired: "on"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminCharacterCreateResponse.status, 303);
+      assert.equal(
+        locationPath(adminCharacterCreateResponse.headers.get("location")),
+        `/admin/games/${fixture.gameId}`
+      );
+
+      const additionalCharacter = await prisma.gameCharacter.findUniqueOrThrow({
+        where: {
+          gameVersionId_key: {
+            gameVersionId: fixture.versionId,
+            key: "additional-suspect"
+          }
+        },
+        select: { name: true, privateBio: true, isRequired: true }
+      });
+      assert.deepEqual(additionalCharacter, {
+        name: "Additional Suspect",
+        privateBio: "Private addition from access-control tests.",
+        isRequired: true
+      });
+
+      const duplicateCharacterResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/characters`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            key: "additional-suspect",
+            name: "Duplicate Suspect",
+            publicBio: "Duplicate character edit.",
+            privateBio: "",
+            sortOrder: "3",
+            isRequired: "on"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(duplicateCharacterResponse.status, 303);
+      assert.match(duplicateCharacterResponse.headers.get("location") ?? "", /error=duplicate-character/);
+
+      const adminCharacterUpdateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/characters`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            characterId: fixture.characterId,
+            key: "test-character-edited",
+            name: "Edited Test Character",
+            publicBio: "Edited character public bio.",
+            privateBio: "Edited character private bio.",
+            sortOrder: "10"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminCharacterUpdateResponse.status, 303);
+      assert.equal(
+        locationPath(adminCharacterUpdateResponse.headers.get("location")),
+        `/admin/games/${fixture.gameId}`
+      );
+
+      const editedCharacter = await prisma.gameCharacter.findUniqueOrThrow({
+        where: { id: fixture.characterId },
+        select: {
+          key: true,
+          name: true,
+          publicBio: true,
+          privateBio: true,
+          isRequired: true,
+          sortOrder: true
+        }
+      });
+      assert.deepEqual(editedCharacter, {
+        key: "test-character-edited",
+        name: "Edited Test Character",
+        publicBio: "Edited character public bio.",
+        privateBio: "Edited character private bio.",
+        isRequired: false,
+        sortOrder: 10
+      });
+
+      const characterAuditActions = await prisma.auditLog.findMany({
+        where: {
+          userId: fixture.adminId,
+          action: { in: ["admin.gameCharacter.created", "admin.gameCharacter.updated"] }
+        },
+        select: { action: true }
+      });
+      assert.equal(
+        characterAuditActions.filter((auditAction) => auditAction.action === "admin.gameCharacter.created").length,
+        1
+      );
+      assert.equal(
+        characterAuditActions.filter((auditAction) => auditAction.action === "admin.gameCharacter.updated").length,
+        1
+      );
+
+      const deniedAdminRoundResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/rounds`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.otherHostToken)
+          },
+          body: new URLSearchParams({
+            key: "denied-round",
+            title: "Denied Round",
+            summary: "Denied round edit.",
+            sortOrder: "4"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(deniedAdminRoundResponse.status, 303);
+      assert.equal(locationPath(deniedAdminRoundResponse.headers.get("location")), "/dashboard");
+
+      const adminRoundCreateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/rounds`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            key: "bonus-round",
+            title: "Bonus Round",
+            summary: "Added by access-control tests.",
+            sortOrder: "4"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminRoundCreateResponse.status, 303);
+      assert.equal(locationPath(adminRoundCreateResponse.headers.get("location")), `/admin/games/${fixture.gameId}`);
+
+      const bonusRound = await prisma.gameRound.findUniqueOrThrow({
+        where: {
+          gameVersionId_key: {
+            gameVersionId: fixture.versionId,
+            key: "bonus-round"
+          }
+        },
+        select: { id: true, title: true, sortOrder: true }
+      });
+      assert.deepEqual(
+        { title: bonusRound.title, sortOrder: bonusRound.sortOrder },
+        { title: "Bonus Round", sortOrder: 4 }
+      );
+
+      const deniedCardResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/cards`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.otherHostToken)
+          },
+          body: new URLSearchParams({
+            roundId: fixture.roundId,
+            key: "denied-card",
+            title: "Denied Card",
+            body: "Denied card edit.",
+            visibility: "PUBLIC",
+            sortOrder: "1"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(deniedCardResponse.status, 303);
+      assert.equal(locationPath(deniedCardResponse.headers.get("location")), "/dashboard");
+
+      const adminCardCreateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/cards`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            roundId: bonusRound.id,
+            key: "bonus-public-card",
+            title: "Bonus Public Card",
+            body: "Added by access-control tests.",
+            visibility: "PUBLIC",
+            sortOrder: "1"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminCardCreateResponse.status, 303);
+      assert.equal(locationPath(adminCardCreateResponse.headers.get("location")), `/admin/games/${fixture.gameId}`);
+
+      const bonusCard = await prisma.gameCard.findUniqueOrThrow({
+        where: {
+          gameRoundId_key: {
+            gameRoundId: bonusRound.id,
+            key: "bonus-public-card"
+          }
+        },
+        select: { title: true, visibility: true, characterId: true }
+      });
+      assert.deepEqual(bonusCard, {
+        title: "Bonus Public Card",
+        visibility: "PUBLIC",
+        characterId: null
+      });
+
+      const duplicateCardResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/cards`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            roundId: bonusRound.id,
+            key: "bonus-public-card",
+            title: "Duplicate Bonus Card",
+            body: "Duplicate card key in the same round.",
+            visibility: "PUBLIC",
+            sortOrder: "2"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(duplicateCardResponse.status, 303);
+      assert.match(duplicateCardResponse.headers.get("location") ?? "", /error=duplicate-card/);
+
+      const roundCardAuditActions = await prisma.auditLog.findMany({
+        where: {
+          userId: fixture.adminId,
+          action: { in: ["admin.gameRound.created", "admin.gameCard.created"] }
+        },
+        select: { action: true }
+      });
+      assert.equal(
+        roundCardAuditActions.filter((auditAction) => auditAction.action === "admin.gameRound.created").length,
+        1
+      );
+      assert.equal(
+        roundCardAuditActions.filter((auditAction) => auditAction.action === "admin.gameCard.created").length,
+        1
+      );
+
+      const deniedAdminEvidenceResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/evidence`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.otherHostToken)
+          },
+          body: new URLSearchParams({
+            gameRoundId: fixture.roundId,
+            key: "denied-admin-evidence",
+            title: "Denied Admin Evidence",
+            body: "Denied evidence edit.",
+            evidenceType: "DOCUMENT",
+            visibility: "PUBLIC",
+            sortOrder: "1"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(deniedAdminEvidenceResponse.status, 303);
+      assert.equal(locationPath(deniedAdminEvidenceResponse.headers.get("location")), "/dashboard");
+
+      const adminEvidenceCreateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/evidence`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            gameRoundId: fixture.roundId,
+            key: "admin-evidence",
+            title: "Admin Evidence",
+            body: "Added by access-control tests.",
+            evidenceType: "DOCUMENT",
+            visibility: "PUBLIC",
+            sortOrder: "5"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminEvidenceCreateResponse.status, 303);
+      assert.equal(locationPath(adminEvidenceCreateResponse.headers.get("location")), `/admin/games/${fixture.gameId}`);
+
+      const adminEvidence = await prisma.gameEvidence.findUniqueOrThrow({
+        where: {
+          gameVersionId_key: {
+            gameVersionId: fixture.versionId,
+            key: "admin-evidence"
+          }
+        },
+        select: { id: true, title: true, gameRoundId: true, visibility: true }
+      });
+      assert.deepEqual(
+        { title: adminEvidence.title, gameRoundId: adminEvidence.gameRoundId, visibility: adminEvidence.visibility },
+        { title: "Admin Evidence", gameRoundId: fixture.roundId, visibility: "PUBLIC" }
+      );
+
+      const duplicateEvidenceResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/evidence`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            key: "admin-evidence",
+            title: "Duplicate Admin Evidence",
+            body: "Duplicate evidence key.",
+            evidenceType: "DOCUMENT",
+            visibility: "PUBLIC",
+            sortOrder: "6"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(duplicateEvidenceResponse.status, 303);
+      assert.match(duplicateEvidenceResponse.headers.get("location") ?? "", /error=duplicate-evidence/);
+
+      const deniedAdminMediaResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/media`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.otherHostToken)
+          },
+          body: new URLSearchParams({
+            gameRoundId: fixture.roundId,
+            evidenceId: adminEvidence.id,
+            key: "denied-admin-media",
+            title: "Denied Admin Media",
+            description: "Denied media edit.",
+            assetType: "IMAGE",
+            url: "/media/denied-admin-media.png",
+            mimeType: "image/png",
+            visibility: "PUBLIC",
+            sortOrder: "1"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(deniedAdminMediaResponse.status, 303);
+      assert.equal(locationPath(deniedAdminMediaResponse.headers.get("location")), "/dashboard");
+
+      const adminMediaCreateResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/media`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            gameRoundId: fixture.roundId,
+            evidenceId: adminEvidence.id,
+            key: "admin-media",
+            title: "Admin Media",
+            description: "Added by access-control tests.",
+            assetType: "IMAGE",
+            url: "/media/admin-media.png",
+            mimeType: "image/png",
+            visibility: "PUBLIC",
+            sortOrder: "5"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(adminMediaCreateResponse.status, 303);
+      assert.equal(locationPath(adminMediaCreateResponse.headers.get("location")), `/admin/games/${fixture.gameId}`);
+
+      const adminMedia = await prisma.gameMediaAsset.findUniqueOrThrow({
+        where: {
+          gameVersionId_key: {
+            gameVersionId: fixture.versionId,
+            key: "admin-media"
+          }
+        },
+        select: { title: true, evidenceId: true, assetType: true, url: true }
+      });
+      assert.deepEqual(adminMedia, {
+        title: "Admin Media",
+        evidenceId: adminEvidence.id,
+        assetType: "IMAGE",
+        url: "/media/admin-media.png"
+      });
+
+      const duplicateMediaResponse = await fetch(
+        `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/media`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: sessionCookie(fixture.adminToken)
+          },
+          body: new URLSearchParams({
+            key: "admin-media",
+            title: "Duplicate Admin Media",
+            description: "Duplicate media key.",
+            assetType: "IMAGE",
+            url: "/media/duplicate-admin-media.png",
+            mimeType: "image/png",
+            visibility: "PUBLIC",
+            sortOrder: "6"
+          }),
+          redirect: "manual"
+        }
+      );
+      assert.equal(duplicateMediaResponse.status, 303);
+      assert.match(duplicateMediaResponse.headers.get("location") ?? "", /error=duplicate-media/);
+
+      const evidenceMediaAuditActions = await prisma.auditLog.findMany({
+        where: {
+          userId: fixture.adminId,
+          action: { in: ["admin.gameEvidence.created", "admin.gameMedia.created"] }
+        },
+        select: { action: true }
+      });
+      assert.equal(
+        evidenceMediaAuditActions.filter((auditAction) => auditAction.action === "admin.gameEvidence.created").length,
+        1
+      );
+      assert.equal(
+        evidenceMediaAuditActions.filter((auditAction) => auditAction.action === "admin.gameMedia.created").length,
+        1
+      );
+
+      const deniedUploadForm = new FormData();
+      deniedUploadForm.append("file", new Blob(["denied upload"], { type: "text/plain" }), "denied-upload.txt");
+      deniedUploadForm.append("access", "public");
+      const deniedMediaUploadResponse = await fetch(`${appUrl}/admin/media/uploads/create`, {
+        method: "POST",
+        headers: {
+          cookie: sessionCookie(fixture.otherHostToken)
+        },
+        body: deniedUploadForm,
+        redirect: "manual"
+      });
+      assert.equal(deniedMediaUploadResponse.status, 303);
+      assert.equal(locationPath(deniedMediaUploadResponse.headers.get("location")), "/dashboard");
+
+      const adminUploadForm = new FormData();
+      adminUploadForm.append("file", new Blob(["admin upload"], { type: "text/plain" }), "admin-upload.txt");
+      adminUploadForm.append("access", "public");
+      const adminMediaUploadResponse = await fetch(`${appUrl}/admin/media/uploads/create`, {
+        method: "POST",
+        headers: {
+          cookie: sessionCookie(fixture.adminToken)
+        },
+        body: adminUploadForm,
+        redirect: "manual"
+      });
+      assert.equal(adminMediaUploadResponse.status, 303);
+      assert.equal(locationPath(adminMediaUploadResponse.headers.get("location")), "/admin/media/uploads");
+      const uploadLocation = new URL(adminMediaUploadResponse.headers.get("location") ?? "", appUrl);
+      assert.equal(uploadLocation.searchParams.get("uploaded"), "1");
+      const uploadedUrl = uploadLocation.searchParams.get("url") ?? "";
+      assert.match(uploadedUrl, /^\/uploads\/media\/\d{4}\/\d{2}\//);
+      await unlink(path.join(process.cwd(), "public", uploadedUrl.replace(/^\//, ""))).catch(() => undefined);
+
+      const mediaUploadAuditCount = await prisma.auditLog.count({
+        where: {
+          userId: fixture.adminId,
+          action: "admin.mediaUpload.created"
+        }
+      });
+      assert.equal(mediaUploadAuditCount, 1);
+
       const adminPublishVersionResponse = await fetch(
         `${appUrl}/admin/games/${fixture.gameId}/versions/${fixture.versionId}/status`,
         {
@@ -1214,12 +1938,27 @@ test(
       const adminAuditActions = await prisma.auditLog.findMany({
         where: {
           userId: fixture.adminId,
-          action: { in: ["support.ticket.statusChanged", "admin.gameVersion.statusChanged"] }
+          action: {
+            in: [
+              "support.ticket.statusChanged",
+              "support.ticket.internalNoteAdded",
+              "support.ticket.replied",
+              "admin.gameVersion.statusChanged"
+            ]
+          }
         },
         select: { action: true }
       });
       assert.equal(
         adminAuditActions.filter((auditAction) => auditAction.action === "support.ticket.statusChanged").length,
+        1
+      );
+      assert.equal(
+        adminAuditActions.filter((auditAction) => auditAction.action === "support.ticket.internalNoteAdded").length,
+        1
+      );
+      assert.equal(
+        adminAuditActions.filter((auditAction) => auditAction.action === "support.ticket.replied").length,
         1
       );
       assert.equal(
@@ -1301,6 +2040,7 @@ test(
         })
       ).map((log) => log.action);
       const expectedAuditActionCounts = new Map([
+        ["party.spoilerMode.unlocked", 1],
         ["party.assignment.saved", 3],
         ["party.assignment.cleared", 1],
         ["party.invitation.resent", 1],
@@ -1323,7 +2063,10 @@ test(
           `${action} audit count`
         );
       }
-      assert.equal(auditActions.length, 16);
+      assert.equal(
+        auditActions.length,
+        Array.from(expectedAuditActionCounts.values()).reduce((total, count) => total + count, 0)
+      );
     } finally {
       await deleteTestData(fixture.slugPrefix, fixture.emailDomain);
     }

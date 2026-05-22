@@ -19,6 +19,7 @@ model User {
   name               String
   role               UserRole                @default(HOST)
   passwordHash       String?
+  emailVerifiedAt    DateTime?
   phoneNumber        String                  @default("")
   phoneVerifiedAt    DateTime?
   notificationPrefs  Json                    @default("{}")
@@ -31,6 +32,7 @@ model User {
   gameAccess         UserGameAccess[]
   outboundMessages   OutboundMessage[]
   supportTickets     SupportTicket[]
+  supportMessages    SupportTicketMessage[]
   completedResults   PartyResult[]
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
@@ -46,41 +48,65 @@ model UserSession {
 }
 
 model Party {
-  id               String                     @id @default(cuid())
-  title            String
-  gameSlug         String
-  gameId           String?
-  game             Game?                      @relation(fields: [gameId], references: [id])
-  gameVersionId    String?
-  gameVersion      GameVersion?               @relation(fields: [gameVersionId], references: [id])
-  hostId           String
-  host             User                       @relation(fields: [hostId], references: [id])
-  inviteCode       String                     @unique
-  status           String                     @default("PENDING")
-  guests           Guest[]
-  assignments      PartyCharacterAssignment[]
-  roundStates      PartyRoundState[]
-  evidenceReveals  PartyEvidenceReveal[]
-  accusations      PartyAccusation[]
-  finalRevealState PartyFinalRevealState?
-  result           PartyResult?
-  auditLogs        AuditLog[]
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
+  id                          String                     @id @default(cuid())
+  title                       String
+  gameSlug                    String
+  gameId                      String?
+  game                        Game?                      @relation(fields: [gameId], references: [id])
+  gameVersionId               String?
+  gameVersion                 GameVersion?               @relation(fields: [gameVersionId], references: [id])
+  hostId                      String
+  host                        User                       @relation(fields: [hostId], references: [id])
+  inviteCode                  String                     @unique
+  status                      String                     @default("PENDING")
+  hostSpoilerUnlockedAt       DateTime?
+  hostSpoilerUnlockedByUserId String?
+  guests                      Guest[]
+  assignments                 PartyCharacterAssignment[]
+  roundStates                 PartyRoundState[]
+  evidenceReveals             PartyEvidenceReveal[]
+  accusations                 PartyAccusation[]
+  finalRevealState            PartyFinalRevealState?
+  result                      PartyResult?
+  auditLogs                   AuditLog[]
+  toolInstances               PartyToolInstance[]
+  unlockEvents                PartyUnlockEvent[]
+  codeAttempts                PartyCodeAttempt[]
+  assetViews                  PartyAssetView[]
+  playerInteractions          PartyPlayerInteraction[]
+  playerInventory             PartyPlayerInventory[]
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
 }
 
 model Guest {
-  id          String                     @id @default(cuid())
-  partyId     String
-  party       Party                      @relation(fields: [partyId], references: [id])
-  name        String                     @default("")
-  email       String
-  status      String                     @default("INVITED")
-  guestToken  String                     @unique
-  joinedAt    DateTime?
-  assignments PartyCharacterAssignment[]
-  accusations PartyAccusation[]
-  createdAt   DateTime                   @default(now())
+  id                      String                     @id @default(cuid())
+  partyId                 String
+  party                   Party                      @relation(fields: [partyId], references: [id])
+  name                    String                     @default("")
+  email                   String
+  status                  String                     @default("INVITED")
+  invitationStatus        String                     @default("NOT_SENT")
+  invitationLastQueuedAt  DateTime?
+  invitationLastSentAt    DateTime?
+  invitationResendCount   Int                        @default(0)
+  invitationFailedAt      DateTime?
+  invitationFailureDetail String                     @default("")
+  guestToken              String                     @unique
+  joinedAt                DateTime?
+  assignments             PartyCharacterAssignment[]
+  accusations             PartyAccusation[]
+  toolInstances           PartyToolInstance[]
+  unlockEventsAsActor     PartyUnlockEvent[]         @relation("UnlockActorGuest")
+  unlockEventsAsTarget    PartyUnlockEvent[]         @relation("UnlockTargetGuest")
+  codeAttempts            PartyCodeAttempt[]
+  assetViews              PartyAssetView[]
+  interactionsAsActor     PartyPlayerInteraction[]   @relation("InteractionActorGuest")
+  interactionsAsTarget    PartyPlayerInteraction[]   @relation("InteractionTargetGuest")
+  inventoryItems          PartyPlayerInventory[]
+  createdAt               DateTime                   @default(now())
+
+  @@index([partyId, invitationStatus])
 }
 
 model Game {
@@ -103,21 +129,24 @@ model Game {
 }
 
 model GameVersion {
-  id            String           @id @default(cuid())
-  gameId        String
-  game          Game             @relation(fields: [gameId], references: [id])
-  versionNumber Int
-  status        String           @default("DRAFT")
-  themes        Json             @default("[]")
-  publishedAt   DateTime?
-  parties       Party[]
-  characters    GameCharacter[]
-  rounds        GameRound[]
-  evidence      GameEvidence[]
-  finalReveal   GameFinalReveal?
-  mediaAssets   GameMediaAsset[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id               String                @id @default(cuid())
+  gameId           String
+  game             Game                  @relation(fields: [gameId], references: [id])
+  versionNumber    Int
+  status           String                @default("DRAFT")
+  themes           Json                  @default("[]")
+  publishedAt      DateTime?
+  parties          Party[]
+  characters       GameCharacter[]
+  rounds           GameRound[]
+  evidence         GameEvidence[]
+  finalReveal      GameFinalReveal?
+  mediaAssets      GameMediaAsset[]
+  digitalArtifacts GameDigitalArtifact[]
+  characterTools   GameCharacterTool[]
+  unlockRules      GameUnlockRule[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   @@unique([gameId, versionNumber])
 }
@@ -136,6 +165,9 @@ model GameCharacter {
   cards                GameCard[]
   evidence             GameEvidence[]
   mediaAssets          GameMediaAsset[]
+  digitalArtifacts     GameDigitalArtifact[]
+  characterTools       GameCharacterTool[]
+  unlockRules          GameUnlockRule[]           @relation("UnlockRuleRequiredCharacter")
   accusationsAsSuspect PartyAccusation[]          @relation("AccusedCharacter")
   victimInReveals      GameFinalReveal[]          @relation("VictimCharacter")
   killerInReveals      GameFinalReveal[]          @relation("KillerCharacter")
@@ -146,90 +178,100 @@ model GameCharacter {
 }
 
 model GameRound {
-  id            String            @id @default(cuid())
-  gameVersionId String
-  gameVersion   GameVersion       @relation(fields: [gameVersionId], references: [id])
-  key           String
-  title         String
-  summary       String            @default("")
-  sortOrder     Int               @default(0)
-  cards         GameCard[]
-  evidence      GameEvidence[]
-  mediaAssets   GameMediaAsset[]
-  partyStates   PartyRoundState[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                       String                @id @default(cuid())
+  gameVersionId            String
+  gameVersion              GameVersion           @relation(fields: [gameVersionId], references: [id])
+  key                      String
+  title                    String
+  summary                  String                @default("")
+  sortOrder                Int                   @default(0)
+  cards                    GameCard[]
+  evidence                 GameEvidence[]
+  mediaAssets              GameMediaAsset[]
+  digitalArtifacts         GameDigitalArtifact[]
+  unlockRulesRequiredRound GameUnlockRule[]      @relation("UnlockRuleRequiredRound")
+  partyStates              PartyRoundState[]
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
 
   @@unique([gameVersionId, key])
 }
 
 model GameCard {
-  id          String         @id @default(cuid())
-  gameRoundId String
-  gameRound   GameRound      @relation(fields: [gameRoundId], references: [id])
-  characterId String?
-  character   GameCharacter? @relation(fields: [characterId], references: [id])
-  key         String
-  title       String
-  body        String
-  visibility  String         @default("PLAYER_PRIVATE")
-  sortOrder   Int            @default(0)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id                   String         @id @default(cuid())
+  gameRoundId          String
+  gameRound            GameRound      @relation(fields: [gameRoundId], references: [id])
+  characterId          String?
+  character            GameCharacter? @relation(fields: [characterId], references: [id])
+  key                  String
+  title                String
+  body                 String
+  visibility           String         @default("PLAYER_PRIVATE")
+  requiredUnlockRuleId String         @default("")
+  sortOrder            Int            @default(0)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
   @@unique([gameRoundId, key])
   @@index([gameRoundId, visibility])
+  @@index([requiredUnlockRuleId])
 }
 
 model GameEvidence {
-  id            String                @id @default(cuid())
-  gameVersionId String
-  gameVersion   GameVersion           @relation(fields: [gameVersionId], references: [id])
-  gameRoundId   String?
-  gameRound     GameRound?            @relation(fields: [gameRoundId], references: [id])
-  characterId   String?
-  character     GameCharacter?        @relation(fields: [characterId], references: [id])
-  key           String
-  title         String
-  body          String
-  evidenceType  String                @default("TEXT")
-  visibility    String                @default("PUBLIC")
-  sortOrder     Int                   @default(0)
-  partyReveals  PartyEvidenceReveal[]
-  mediaAssets   GameMediaAsset[]
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  id                   String                @id @default(cuid())
+  gameVersionId        String
+  gameVersion          GameVersion           @relation(fields: [gameVersionId], references: [id])
+  gameRoundId          String?
+  gameRound            GameRound?            @relation(fields: [gameRoundId], references: [id])
+  characterId          String?
+  character            GameCharacter?        @relation(fields: [characterId], references: [id])
+  key                  String
+  title                String
+  body                 String
+  evidenceType         String                @default("TEXT")
+  visibility           String                @default("PUBLIC")
+  sortOrder            Int                   @default(0)
+  partyReveals         PartyEvidenceReveal[]
+  mediaAssets          GameMediaAsset[]
+  digitalArtifacts     GameDigitalArtifact[]
+  requiredUnlockRuleId String                @default("")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@unique([gameVersionId, key])
   @@index([gameVersionId, visibility])
   @@index([gameRoundId])
+  @@index([requiredUnlockRuleId])
 }
 
 model GameMediaAsset {
-  id            String         @id @default(cuid())
-  gameVersionId String
-  gameVersion   GameVersion    @relation(fields: [gameVersionId], references: [id])
-  gameRoundId   String?
-  gameRound     GameRound?     @relation(fields: [gameRoundId], references: [id])
-  characterId   String?
-  character     GameCharacter? @relation(fields: [characterId], references: [id])
-  evidenceId    String?
-  evidence      GameEvidence?  @relation(fields: [evidenceId], references: [id])
-  key           String
-  title         String
-  description   String         @default("")
-  assetType     String         @default("DOCUMENT")
-  url           String
-  mimeType      String         @default("")
-  visibility    String         @default("PUBLIC")
-  sortOrder     Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                   String                @id @default(cuid())
+  gameVersionId        String
+  gameVersion          GameVersion           @relation(fields: [gameVersionId], references: [id])
+  gameRoundId          String?
+  gameRound            GameRound?            @relation(fields: [gameRoundId], references: [id])
+  characterId          String?
+  character            GameCharacter?        @relation(fields: [characterId], references: [id])
+  evidenceId           String?
+  evidence             GameEvidence?         @relation(fields: [evidenceId], references: [id])
+  key                  String
+  title                String
+  description          String                @default("")
+  assetType            String                @default("DOCUMENT")
+  url                  String
+  mimeType             String                @default("")
+  visibility           String                @default("PUBLIC")
+  requiredUnlockRuleId String                @default("")
+  digitalArtifacts     GameDigitalArtifact[]
+  sortOrder            Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@unique([gameVersionId, key])
   @@index([gameVersionId, visibility])
   @@index([gameRoundId])
   @@index([evidenceId])
+  @@index([requiredUnlockRuleId])
 }
 
 model GameFinalReveal {
@@ -251,6 +293,94 @@ model GameFinalReveal {
 
   @@index([victimCharacterId])
   @@index([killerCharacterId])
+}
+
+model GameDigitalArtifact {
+  id                   String          @id @default(cuid())
+  gameVersionId        String
+  gameVersion          GameVersion     @relation(fields: [gameVersionId], references: [id])
+  gameRoundId          String?
+  gameRound            GameRound?      @relation(fields: [gameRoundId], references: [id])
+  characterId          String?
+  character            GameCharacter?  @relation(fields: [characterId], references: [id])
+  evidenceId           String?
+  evidence             GameEvidence?   @relation(fields: [evidenceId], references: [id])
+  mediaAssetId         String?
+  mediaAsset           GameMediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  key                  String
+  title                String
+  description          String          @default("")
+  artifactType         String          @default("DOCUMENT")
+  visibility           String          @default("PLAYER_PRIVATE")
+  requiredUnlockRuleId String          @default("")
+  content              Json            @default("{}")
+  sortOrder            Int             @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@unique([gameVersionId, key])
+  @@index([gameVersionId, visibility])
+  @@index([gameRoundId])
+  @@index([characterId])
+  @@index([requiredUnlockRuleId])
+}
+
+model GameCharacterTool {
+  id            String              @id @default(cuid())
+  gameVersionId String
+  gameVersion   GameVersion         @relation(fields: [gameVersionId], references: [id])
+  characterId   String
+  character     GameCharacter       @relation(fields: [characterId], references: [id])
+  key           String
+  title         String
+  description   String              @default("")
+  toolType      String              @default("GENERIC")
+  visibility    String              @default("PLAYER_PRIVATE")
+  config        Json                @default("{}")
+  sortOrder     Int                 @default(0)
+  instances     PartyToolInstance[]
+  unlockRules   GameUnlockRule[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([gameVersionId, key])
+  @@index([characterId])
+  @@index([gameVersionId, visibility])
+}
+
+model GameUnlockRule {
+  id                  String              @id @default(cuid())
+  gameVersionId       String
+  gameVersion         GameVersion         @relation(fields: [gameVersionId], references: [id])
+  requiredRoundId     String?
+  requiredRound       GameRound?          @relation("UnlockRuleRequiredRound", fields: [requiredRoundId], references: [id])
+  requiredCharacterId String?
+  requiredCharacter   GameCharacter?      @relation("UnlockRuleRequiredCharacter", fields: [requiredCharacterId], references: [id])
+  sourceToolId        String?
+  sourceTool          GameCharacterTool?  @relation(fields: [sourceToolId], references: [id])
+  key                 String
+  title               String
+  description         String              @default("")
+  ruleType            String              @default("MANUAL")
+  triggerType         String              @default("HOST_APPROVAL")
+  targetType          String
+  targetId            String
+  unlockScope         String              @default("PLAYER")
+  codeMode            String              @default("")
+  config              Json                @default("{}")
+  effect              Json                @default("{}")
+  status              String              @default("DRAFT")
+  sortOrder           Int                 @default(0)
+  toolInstances       PartyToolInstance[]
+  unlockEvents        PartyUnlockEvent[]
+  codeAttempts        PartyCodeAttempt[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([gameVersionId, key])
+  @@index([gameVersionId, status])
+  @@index([targetType, targetId])
+  @@index([sourceToolId])
 }
 
 model PartyRoundState {
@@ -342,6 +472,136 @@ model PartyResult {
   updatedAt         DateTime @updatedAt
 
   @@index([completedByUserId, completedAt])
+}
+
+model PartyToolInstance {
+  id              String             @id @default(cuid())
+  partyId         String
+  party           Party              @relation(fields: [partyId], references: [id])
+  characterToolId String
+  characterTool   GameCharacterTool  @relation(fields: [characterToolId], references: [id])
+  unlockRuleId    String?
+  unlockRule      GameUnlockRule?    @relation(fields: [unlockRuleId], references: [id])
+  guestId         String?
+  guest           Guest?             @relation(fields: [guestId], references: [id])
+  status          String             @default("ACTIVE")
+  codeHash        String             @default("")
+  codeSalt        String             @default("")
+  usesRemaining   Int                @default(1)
+  metadata        Json               @default("{}")
+  expiresAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  codeAttempts    PartyCodeAttempt[]
+
+  @@index([partyId, status])
+  @@index([characterToolId])
+  @@index([unlockRuleId])
+  @@index([guestId])
+}
+
+model PartyUnlockEvent {
+  id            String          @id @default(cuid())
+  partyId       String
+  party         Party           @relation(fields: [partyId], references: [id])
+  unlockRuleId  String?
+  unlockRule    GameUnlockRule? @relation(fields: [unlockRuleId], references: [id])
+  actorGuestId  String?
+  actorGuest    Guest?          @relation("UnlockActorGuest", fields: [actorGuestId], references: [id])
+  targetGuestId String?
+  targetGuest   Guest?          @relation("UnlockTargetGuest", fields: [targetGuestId], references: [id])
+  targetType    String
+  targetId      String
+  unlockScope   String          @default("PLAYER")
+  status        String          @default("UNLOCKED")
+  metadata      Json            @default("{}")
+  createdAt     DateTime        @default(now())
+
+  @@index([partyId, createdAt])
+  @@index([unlockRuleId])
+  @@index([targetType, targetId])
+  @@index([actorGuestId, createdAt])
+  @@index([targetGuestId, createdAt])
+}
+
+model PartyCodeAttempt {
+  id             String             @id @default(cuid())
+  partyId        String
+  party          Party              @relation(fields: [partyId], references: [id])
+  unlockRuleId   String?
+  unlockRule     GameUnlockRule?    @relation(fields: [unlockRuleId], references: [id])
+  toolInstanceId String?
+  toolInstance   PartyToolInstance? @relation(fields: [toolInstanceId], references: [id])
+  actorGuestId   String?
+  actorGuest     Guest?             @relation(fields: [actorGuestId], references: [id])
+  codeHash       String             @default("")
+  status         String
+  metadata       Json               @default("{}")
+  createdAt      DateTime           @default(now())
+
+  @@index([partyId, createdAt])
+  @@index([unlockRuleId])
+  @@index([toolInstanceId])
+  @@index([actorGuestId, createdAt])
+}
+
+model PartyAssetView {
+  id         String   @id @default(cuid())
+  partyId    String
+  party      Party    @relation(fields: [partyId], references: [id])
+  guestId    String?
+  guest      Guest?   @relation(fields: [guestId], references: [id])
+  targetType String
+  targetId   String
+  metadata   Json     @default("{}")
+  viewedAt   DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([partyId, viewedAt])
+  @@index([guestId, viewedAt])
+  @@index([targetType, targetId])
+}
+
+model PartyPlayerInteraction {
+  id              String   @id @default(cuid())
+  partyId         String
+  party           Party    @relation(fields: [partyId], references: [id])
+  actorGuestId    String?
+  actorGuest      Guest?   @relation("InteractionActorGuest", fields: [actorGuestId], references: [id])
+  targetGuestId   String?
+  targetGuest     Guest?   @relation("InteractionTargetGuest", fields: [targetGuestId], references: [id])
+  interactionType String
+  sourceType      String   @default("")
+  sourceId        String   @default("")
+  status          String   @default("RECORDED")
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
+
+  @@index([partyId, createdAt])
+  @@index([actorGuestId, createdAt])
+  @@index([targetGuestId, createdAt])
+  @@index([interactionType, createdAt])
+}
+
+model PartyPlayerInventory {
+  id         String   @id @default(cuid())
+  partyId    String
+  party      Party    @relation(fields: [partyId], references: [id])
+  guestId    String
+  guest      Guest    @relation(fields: [guestId], references: [id])
+  itemType   String
+  itemId     String
+  sourceType String   @default("")
+  sourceId   String   @default("")
+  status     String   @default("ACTIVE")
+  metadata   Json     @default("{}")
+  acquiredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([partyId, guestId, itemType, itemId])
+  @@index([partyId, guestId])
+  @@index([itemType, itemId])
 }
 
 model Product {
@@ -472,19 +732,36 @@ model AuditLog {
 }
 
 model SupportTicket {
-  id        String   @id @default(cuid())
+  id        String                 @id @default(cuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?                  @relation(fields: [userId], references: [id])
   email     String
   subject   String
   message   String
-  status    String   @default("OPEN")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status    String                 @default("OPEN")
+  messages  SupportTicketMessage[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
   @@index([email, createdAt])
+}
+
+model SupportTicketMessage {
+  id                String        @id @default(cuid())
+  ticketId          String
+  ticket            SupportTicket @relation(fields: [ticketId], references: [id])
+  authorUserId      String?
+  authorUser        User?         @relation(fields: [authorUserId], references: [id])
+  messageType       String
+  body              String
+  outboundMessageId String        @default("")
+  createdAt         DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([authorUserId, createdAt])
+  @@index([messageType, createdAt])
 }
 
 model RateLimitBucket {

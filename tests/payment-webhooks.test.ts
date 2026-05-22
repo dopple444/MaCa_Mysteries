@@ -4,7 +4,11 @@ import test from "node:test";
 
 import { PrismaClient } from "@prisma/client";
 
-import { markPaymentWebhookEventProcessed, recordPaymentWebhookEvent } from "../app/lib/payment-webhooks";
+import {
+  markPaymentWebhookEventFailed,
+  markPaymentWebhookEventProcessed,
+  recordPaymentWebhookEvent
+} from "../app/lib/payment-webhooks";
 
 const prisma = new PrismaClient();
 
@@ -35,6 +39,16 @@ test("recordPaymentWebhookEvent stores provider events idempotently", async () =
     const processed = await markPaymentWebhookEventProcessed(first.event.id);
     assert.equal(processed.status, "PROCESSED");
     assert.ok(processed.processedAt);
+
+    const failedEventId = `evt_failed_${crypto.randomBytes(6).toString("hex")}`;
+    const failedEvent = await recordPaymentWebhookEvent({
+      provider,
+      eventId: failedEventId,
+      eventType: "checkout.session.completed"
+    });
+    assert.ok(failedEvent.event);
+    const failed = await markPaymentWebhookEventFailed(failedEvent.event.id);
+    assert.equal(failed.status, "FAILED");
   } finally {
     await prisma.paymentWebhookEvent.deleteMany({ where: { provider } });
   }

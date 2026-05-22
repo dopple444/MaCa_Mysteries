@@ -1,5 +1,3 @@
-import "server-only";
-
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -51,6 +49,17 @@ export async function getCurrentGuest() {
                   { sortOrder: "asc" },
                   { title: "asc" }
                 ]
+              },
+              digitalArtifacts: {
+                orderBy: [
+                  { sortOrder: "asc" },
+                  { title: "asc" }
+                ],
+                include: {
+                  gameRound: true,
+                  evidence: true,
+                  mediaAsset: true
+                }
               }
             }
           },
@@ -87,6 +96,7 @@ export async function getCurrentGuest() {
               }
             }
           },
+          unlockEvents: true,
           finalRevealState: {
             include: {
               finalReveal: {

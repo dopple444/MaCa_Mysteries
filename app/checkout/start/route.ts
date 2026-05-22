@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAppUrl } from "../../lib/app-url";
 import { getCurrentUser } from "../../lib/auth";
 import { verifyCsrfToken } from "../../lib/csrf";
 import { getHostGameAccess } from "../../lib/game-access";
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   });
 
   if (access.canHost) {
-    return NextResponse.redirect(new URL(`/host/create?game=${product.game.slug}`, request.url), 303);
+    return NextResponse.redirect(createAppUrl(`/host/create?game=${product.game.slug}`, request.url), 303);
   }
 
   const checkout = await createPendingOrderForProduct({

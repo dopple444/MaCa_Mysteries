@@ -201,6 +201,10 @@ test("createPartyRecord creates guests, round states, and final reveal state", a
         { name: `backup${emailDomain}`, email: `backup${emailDomain}`, status: "INVITED" }
       ]
     );
+    assert.ok(savedParty.guests.every((guest) => guest.invitationStatus === "QUEUED"));
+    assert.ok(savedParty.guests.every((guest) => guest.invitationLastQueuedAt));
+    assert.ok(savedParty.guests.every((guest) => guest.invitationResendCount === 0));
+    assert.ok(savedParty.guests.every((guest) => !guest.invitationFailureDetail));
     assert.deepEqual(
       savedParty.roundStates
         .map((roundState) => roundState.gameRoundId)

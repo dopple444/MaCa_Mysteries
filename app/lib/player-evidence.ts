@@ -1,3 +1,5 @@
+import { canActorSeeConditionalContent } from "./conditional-unlocks";
+
 export type PlayerEvidence = {
   id: string;
   title: string;
@@ -6,6 +8,7 @@ export type PlayerEvidence = {
   visibility: string;
   sortOrder: number;
   characterId: string | null;
+  requiredUnlockRuleId?: string | null;
   gameRound?: {
     title: string;
     sortOrder: number;
@@ -26,18 +29,30 @@ export type VisiblePlayerEvidence = PlayerEvidence & {
   revealedAt: Date | string;
 };
 
-function canPlayerSeeEvidence(evidence: PlayerEvidence, assignment: PlayerEvidenceAssignment) {
-  if (evidence.visibility === "PUBLIC") return true;
-  if (evidence.visibility !== "PLAYER_PRIVATE") return false;
-  return Boolean(assignment?.characterId && evidence.characterId === assignment.characterId);
-}
+type PlayerUnlockContext = {
+  unlockedRuleIds?: Set<string> | string[];
+};
 
 export function getVisiblePlayerEvidence(
   evidenceReveals: PlayerEvidenceReveal[],
-  assignment: PlayerEvidenceAssignment
+  assignment: PlayerEvidenceAssignment,
+  unlockContext: PlayerUnlockContext = {}
 ): VisiblePlayerEvidence[] {
   return evidenceReveals
-    .filter((reveal) => canPlayerSeeEvidence(reveal.evidence, assignment))
+    .filter((reveal) =>
+      canActorSeeConditionalContent(
+        {
+          visibility: reveal.evidence.visibility,
+          characterId: reveal.evidence.characterId,
+          requiredUnlockRuleId: reveal.evidence.requiredUnlockRuleId
+        },
+        {
+          actorType: "PLAYER",
+          characterId: assignment?.characterId,
+          unlockedRuleIds: unlockContext.unlockedRuleIds
+        }
+      )
+    )
     .sort((a, b) => {
       const roundOrderA = a.evidence.gameRound?.sortOrder ?? 999;
       const roundOrderB = b.evidence.gameRound?.sortOrder ?? 999;

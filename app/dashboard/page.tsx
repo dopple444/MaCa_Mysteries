@@ -27,6 +27,18 @@ export default async function DashboardPage() {
           </form>
         </div>
 
+        {!user.emailVerifiedAt && (
+          <div className="mt-8 rounded-2xl border border-yellow-300/20 bg-yellow-500/10 p-5 text-sm text-yellow-100">
+            <p className="font-semibold text-white">Verify your email address</p>
+            <p className="mt-2 leading-6">
+              Email verification is needed for account recovery and production-ready purchase/support notices.
+            </p>
+            <Link href="/account/verify-email" className="mt-3 inline-flex font-semibold text-white hover:text-yellow-50">
+              Manage verification
+            </Link>
+          </div>
+        )}
+
         <div className="mt-12 grid gap-6 md:grid-cols-2">
           <Link href="/host" className="rounded-3xl border border-white/10 bg-slate-950/80 p-8 hover:border-indigo-400">
             <h2 className="text-xl font-semibold text-white">Host experience</h2>

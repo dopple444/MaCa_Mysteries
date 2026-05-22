@@ -1,10 +1,10 @@
 # Technical Risks
 
-Last inspected: 2026-05-19
+Last inspected: 2026-05-22
 
 ## Summary
 
-The app has moved from scaffold to self-hosted MVP foundation. The highest remaining risks are production auth/account recovery, real provider operations, spoiler leakage, content-editing complexity, media safety, deployment discipline, and future marketplace scale.
+The app has moved from scaffold to self-hosted MVP foundation. The highest remaining risks are production auth/account recovery, real provider operations, spoiler leakage, conditional-rule correctness, content-editing complexity, media safety, deployment discipline, and future marketplace scale.
 
 ## Base44 Lock-In
 
@@ -37,11 +37,12 @@ Mitigation:
 Current risk:
 
 - Custom auth has sessions, password hashing, HTTP-only cookies, CSRF, and rate limiting.
-- It still lacks email verification, password reset, account recovery, session revocation, account lockout policy, and OAuth.
+- It has email verification and password reset foundations.
+- It still lacks admin account recovery tooling, session revocation tooling, account lockout policy, and OAuth.
 
 Mitigation:
 
-- Add email verification and password reset before public launch.
+- Use `docs/ACCOUNT_RECOVERY_PROCEDURES.md` as the operating baseline and add admin tooling before public launch.
 - Add session metadata and revocation tools.
 - Audit sensitive account events.
 - Consider Auth.js or another established auth library if OAuth/social login becomes important.
@@ -57,7 +58,7 @@ Mitigation:
 
 - Run Stripe test mode end to end before selling.
 - Keep provider IDs isolated in payment services.
-- Add admin views for failed webhooks and pending orders.
+- Admin views now expose failed webhooks, pending orders, stale pending-order cleanup, and paid access reconciliation; alerting still needs to be added.
 - Add reconciliation for paid provider sessions that did not fulfill locally.
 
 ## Email And SMS
@@ -65,21 +66,25 @@ Mitigation:
 Current risk:
 
 - Outbound messages can be queued, marked sent/failed, and retried.
-- No real email/SMS provider delivery adapter is enabled yet.
+- Guest invitation state now reflects local sent/failed/retry markers, but provider delivery webhooks and bounce/complaint handling are not implemented.
+- Email delivery adapters now support local console mode and Resend; no real SMS provider delivery adapter is enabled yet.
 - SMS opt-in preferences exist, but phone verification and STOP/START compliance are not implemented.
 
 Mitigation:
 
-- Choose email provider first and implement delivery for invitations, purchases, support, and account recovery.
+- Configure production email domain/API credentials and implement templates for invitations, purchases, support, and account recovery.
+- Before go-live, replace the temporary Gmail sender with a verified `MaCaMysteries.com` sender/domain and retest deliverability.
 - Choose SMS provider later and implement phone verification, opt-in history, STOP/START handling, and per-message audit.
 - Add outbound throttling and failure monitoring before enabling production sends.
+- Add provider delivery webhooks so invitation status reflects actual bounces, complaints, and delayed delivery after the initial send request.
 
 ## File And Media Storage
 
 Current risk:
 
-- Seeded media metadata and upload validation helpers exist.
-- Upload endpoints, object storage writes, signed URLs, private media paths, malware scanning, and admin review are not implemented yet.
+- Seeded media metadata, upload validation helpers, local admin upload endpoints, and conditional media visibility hooks exist.
+- S3-compatible object storage writes, signed URLs, malware scanning, and admin review are not implemented yet.
+- Advanced gameplay will increasingly depend on private media, locked documents, and digital artifacts, making storage authorization more important.
 
 Mitigation:
 
@@ -93,30 +98,69 @@ Mitigation:
 Current risk:
 
 - Server-side visibility helpers protect player cards, evidence, media, accusations, victim reveal, and final reveal content.
+- Conditional unlock checks now hide locked cards/evidence/media unless the current player has the required unlock event.
 - Admin views expose full spoiler content.
-- Host spoiler mode is not yet a distinct unlock flow beyond reveal controls.
+- Host spoiler mode now has a distinct audited unlock flow, but needs continued QA as more content types are added.
 
 Mitigation:
 
 - Keep public/player responses projected and spoiler-safe.
-- Add explicit host spoiler unlock flow with audit logging.
+- Keep explicit host spoiler unlock regression tests as the host view grows.
 - Add content review checklist and validation rules for victim/killer/final solution references.
 - Avoid logging spoiler body text.
+- Keep conditional content filters centralized so new digital artifacts and tools do not bypass the same policy.
+
+## Conditional Reveal Engine
+
+Current risk:
+
+- The foundation models and services exist for digital artifacts, character tools, unlock rules, code attempts, unlock events, asset views, player interactions, and player inventory.
+- The first player-facing access-code unlock path is implemented and tested end to end for locked evidence, cards, media, and digital artifacts.
+- Host party pages now show sanitized code-attempt and unlock-event activity without raw codes.
+- Draft-only authoring screens now exist for digital artifacts, character tools, and unlock rules.
+- Admin preview pages now simulate host-safe, spoiler-host, and selected-character projections.
+- Publish-readiness validation now blocks missing essential content, orphan required unlock rules, unpublished required rules, unattached published rules, and access-code rules without generator tools.
+- Deeper rule classes can still create bad authoring paths until asset-view, host-approval, reveal-state, multi-player interaction, circular dependency, and spoiler-wording validation is expanded.
+- Successful code attempts and unlock events must remain consistent as concurrent gameplay increases.
+
+Mitigation:
+
+- Expand publish-readiness checks for circular dependencies, impossible round/character conditions, unsafe spoiler labels, and every trigger type beyond access-code rules.
+- Add transaction-level guards around limited-use tools and repeated code attempts as gameplay traffic increases.
+- Add admin/global monitoring views for failed attempts, successful unlocks, and unusual retry patterns.
+- Extend tests beyond access codes to asset-view, host-approval, round-state, reveal-state, and multi-player interaction rules.
 
 ## Data Model Complexity
 
 Current risk:
 
-- The schema now covers game versions, characters, rounds, cards, evidence, media, final reveal, parties, assignments, round state, reveals, accusations, results, commerce, support, outbound messages, webhooks, audit logs, and rate limits.
+- The schema now covers game versions, characters, rounds, cards, evidence, media, final reveal, parties, assignments, round state, reveals, accusations, results, commerce, support, outbound messages, webhooks, audit logs, rate limits, and conditional gameplay models.
 - Full content editors are still shallow.
 - Changing game content after parties start can create versioning and compatibility issues.
+- Builder-ready abstractions can grow into a hard-to-maintain rules system without validation and preview tooling.
 
 Mitigation:
 
 - Keep parties pinned to `gameVersionId`.
 - Treat published versions as immutable.
-- Add validation before publishing game versions.
+- Keep validation in the publish path before game versions can become playable.
 - Keep required/optional character and clue redundancy rules explicit.
+- Keep conditional rules tied to immutable game versions and party-scoped runtime events.
+
+## Game Builder Complexity
+
+Current risk:
+
+- Admin editing exists for draft game metadata, characters, rounds, cards, evidence, and media metadata.
+- The builder must eventually cover synopsis, themes, player counts, bios, private backgrounds, relationships, pre-game tasks, round cards, clues, evidence, media, fake messages, final reveal content, spoiler rules, tools, conditional unlocks, previews, and publish/version control.
+- Building a large wizard too early could slow the MVP and create brittle UI around still-evolving rules.
+
+Mitigation:
+
+- Keep the next builder work admin-only and first-party focused.
+- Keep the current small editors and preview pages admin-only until publish validation covers every trigger type.
+- Build deeper publish-readiness checks before large visual wizard screens.
+- Treat creator access as a permission layer over a proven internal builder, not as the first implementation.
 
 ## Scaling To Marketplace
 
@@ -124,12 +168,14 @@ Current risk:
 
 - Marketplace tables and flows are intentionally not in the MVP.
 - Marketplace will require creator accounts, publishing approvals, revenue shares, reviews, moderation, tax/payout handling, and dispute support.
+- Creator-authored conditional mechanics will require stronger validation, preview, moderation, and support tooling than first-party-only content.
 
 Mitigation:
 
 - Keep first-party content stable first.
 - Add creator ownership/source fields only when marketplace work starts.
 - Preserve publishing/versioning rules that can later support creator approvals.
+- Require the internal builder and conditional reveal engine to be stable before enabling outside creators.
 
 ## Mobile Usability
 
@@ -183,14 +229,15 @@ Mitigation:
 
 Current state:
 
-- Support ticket intake, support detail pages, support status controls, admin inventory, audit log, order detail pages, webhook records, and outbound retry controls exist.
+- Support ticket intake, support message history, support detail pages, queued customer replies, internal notes, support status controls, admin inventory, audit log, order detail pages, webhook records, and outbound retry controls exist.
 
 Remaining risk:
 
-- No threaded support replies, internal notes, email-linked replies, or SLA/status history model exists yet.
+- Reply delivery depends on the selected email provider and sender/domain configuration.
+- There is no inbound email reply ingestion, assignment workflow, SLA timer, or status-history automation yet.
 
 Mitigation:
 
-- Add support message/history table.
-- Send replies through the selected email provider.
-- Add internal notes and status history before customer support volume grows.
+- Complete production email sender/domain setup before relying on support replies.
+- Add inbound email reply handling if support should work from an email inbox.
+- Add assignments, SLA/status history, and escalation reporting before customer support volume grows.

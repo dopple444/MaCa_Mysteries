@@ -1,3 +1,5 @@
+import { canActorSeeConditionalContent } from "./conditional-unlocks";
+
 export type PlayerMediaAsset = {
   id: string;
   title: string;
@@ -10,6 +12,7 @@ export type PlayerMediaAsset = {
   characterId: string | null;
   gameRoundId: string | null;
   evidenceId: string | null;
+  requiredUnlockRuleId?: string | null;
 };
 
 export type PlayerMediaAssignment = {
@@ -21,17 +24,16 @@ export type PlayerMediaRoundState = {
   gameRoundId: string;
 };
 
-function canPlayerSeeMedia(media: PlayerMediaAsset, assignment: PlayerMediaAssignment) {
-  if (media.visibility === "PUBLIC") return true;
-  if (media.visibility !== "PLAYER_PRIVATE") return false;
-  return Boolean(assignment?.characterId && media.characterId === assignment.characterId);
-}
+type PlayerUnlockContext = {
+  unlockedRuleIds?: Set<string> | string[];
+};
 
 export function getVisiblePlayerMedia(
   mediaAssets: PlayerMediaAsset[],
   assignment: PlayerMediaAssignment,
   roundStates: PlayerMediaRoundState[],
-  visibleEvidenceIds: Set<string>
+  visibleEvidenceIds: Set<string>,
+  unlockContext: PlayerUnlockContext = {}
 ) {
   const availableRoundIds = new Set(
     roundStates
@@ -40,8 +42,15 @@ export function getVisiblePlayerMedia(
   );
 
   return mediaAssets
-    .filter((media) => canPlayerSeeMedia(media, assignment))
-    .filter((media) => !media.gameRoundId || availableRoundIds.has(media.gameRoundId))
+    .filter((media) =>
+      canActorSeeConditionalContent(media, {
+        actorType: "PLAYER",
+        characterId: assignment?.characterId,
+        activeRoundIds: availableRoundIds,
+        completedRoundIds: availableRoundIds,
+        unlockedRuleIds: unlockContext.unlockedRuleIds
+      })
+    )
     .filter((media) => !media.evidenceId || visibleEvidenceIds.has(media.evidenceId))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
 }

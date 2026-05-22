@@ -1,6 +1,6 @@
 # Current App Map
 
-Last inspected: 2026-05-17
+Last inspected: 2026-05-22
 
 ## Summary
 
@@ -12,7 +12,7 @@ Important current-state notes:
 - The app already contains Next.js API routes under `app/api`.
 - The app already contains custom session/auth helpers under `app/lib`.
 - No Base44 SDK usage was found in application source.
-- The local `.git` directory appears to be an empty directory, so this workspace is not currently functioning as a Git repository.
+- The workspace is a Git working tree with a large uncommitted platform slice. Do not commit changes unless explicitly requested.
 
 ## Framework And Build Tooling
 
@@ -49,8 +49,11 @@ Key dependency versions from `package.json`:
 | `app/lib/` | Server-side helpers for auth, Prisma, database-backed games, and party actions. |
 | `app/games/` | Public game catalog and game detail pages. |
 | `app/host/` | Host-facing pages for learning about hosting, creating parties, and managing a created party. |
-| `app/login/` | Host sign-in page. |
-| `app/signup/` | Host registration page. |
+| `app/login/` | Host sign-in page with password reset link. |
+| `app/signup/` | Host registration page that queues email verification. |
+| `app/forgot-password/` | Password reset request page. |
+| `app/reset-password/` | Signed-token password reset page. |
+| `app/account/verify-email/` | Email verification status, resend, and confirmation route. |
 | `app/dashboard/` | Authenticated host dashboard. |
 | `app/join/` | Guest join page. Looks up parties by invite code and creates a guest session. |
 | `app/play/` | Basic player lobby for joined guests waiting on character assignment. |
@@ -76,8 +79,8 @@ Key dependency versions from `package.json`:
 | --- | --- |
 | `app/games/page.tsx` | Public catalog page. Reads published games from PostgreSQL through `app/lib/games.ts`. |
 | `app/games/[slug]/page.tsx` | Public game detail page. Reads a published game by slug and uses `notFound()` when slug is unknown. |
-| `app/join/page.tsx` | Guest join form. Reads `?code=` from search params, submits to `joinParty()`, and shows validation errors. |
-| `app/play/page.tsx` | Basic guest-authenticated player lobby. Shows party, game, guest email, guest status, and a waiting message. |
+| `app/join/page.tsx` | Mobile-friendly guest join form. Reads `?code=` from search params, submits to `joinParty()`, and shows validation errors. |
+| `app/play/page.tsx` | Mobile-friendly guest-authenticated player view. Shows party, character, character tools, locked-content code-entry prompts, cards, evidence, media, digital artifacts, accusation form, reveal content, game, guest email, and guest status through player-safe filters. |
 
 ### Auth Screens
 
@@ -93,7 +96,7 @@ Key dependency versions from `package.json`:
 | --- | --- |
 | `app/host/page.tsx` | Marketing/feature shell for host experience. Does not require auth and does not read backend data. |
 | `app/host/create/page.tsx` | Authenticated party creation form. Reads selected game from `?game=slug` using `getGameBySlug()`. Submits to `createParty`. |
-| `app/host/party/[partyId]/page.tsx` | Authenticated party control screen. Reads party, linked game/version, and guests from Prisma, verifies current user owns party, shows invite code and guests, and allows adding another guest. |
+| `app/host/party/[partyId]/page.tsx` | Authenticated party control screen. Reads party, linked game/version, guests, invitation delivery state, gameplay state, and conditional unlock activity from Prisma, verifies current user owns party, shows invite code and guests, and allows adding another guest. |
 
 ### API Routes
 
@@ -109,10 +112,26 @@ Key dependency versions from `package.json`:
 | `app/lib/prisma.ts` | Creates/reuses a Prisma Client instance and stores it on `globalThis` during development. |
 | `app/lib/auth.ts` | Custom password hashing, password verification, session token creation, session clearing, current-user lookup, and auth guard. |
 | `app/lib/auth-actions.ts` | Server actions for login, signup, and logout. Uses Prisma and redirects after completion. |
+| `app/lib/account-security.ts` | Signed account-action tokens, email verification queueing, password reset queueing, and password reset fulfillment. |
+| `app/lib/account-security-actions.ts` | Server actions for verification resend, password reset request, and password reset confirmation. |
 | `app/lib/guest-auth.ts` | Guest cookie/session helpers for joined player access. |
 | `app/lib/join-actions.ts` | Server action for joining a party by invite code, name, and email. |
 | `app/lib/party-actions.ts` | Server actions for creating parties and adding guests. Generates invite codes and guest tokens. |
+| `app/lib/notifications.ts` | Queues party invitation emails and updates guest invitation queue/resend state. |
+| `app/lib/outbound-delivery.ts` | Outbound email/SMS helpers, provider selection, sent/failed/retry markers, Resend delivery, and invitation delivery-state synchronization. |
 | `app/lib/games.ts` | Database-backed helpers for published game catalog reads and public game detail lookup. |
+| `app/lib/admin-characters.ts` | Admin content-editing service for draft-version character create/update validation, duplicate key checks, and required-character coverage. |
+| `app/lib/admin-rounds.ts` | Admin content-editing service for draft-version round/card create/update validation, visibility checks, duplicate keys, and published-version locks. |
+| `app/lib/admin-evidence.ts` | Admin content-editing service for draft-version evidence/media metadata validation, linkage checks, duplicate keys, and published-version locks. |
+| `app/lib/admin-builder.ts` | Admin content-editing service for draft-version digital artifacts, character tools, unlock rules, JSON payload validation, target linkage checks, access-code tool checks, duplicate keys, and published-version locks. |
+| `app/lib/builder-preview.ts` | Admin preview projection service for host-safe, spoiler-host, and character-specific views using round progress and simulated unlock rules. |
+| `app/lib/publish-readiness.ts` | Game-version validation service used before publishing; checks required content, final reveal presence, version-owned links, required unlock rules, and access-code generator wiring. |
+| `app/lib/admin-version-status.ts` | Admin game-version status service that blocks unsafe publish attempts, updates publish timestamps, and audits status changes. |
+| `app/lib/conditional-unlocks.ts` | Conditional reveal service for actor visibility checks, guest/host unlock projections, party tool code creation, access-code attempts, and unlock events. |
+| `app/lib/conditional-activity.ts` | Host-safe conditional activity projection for code attempts and unlock events. Redacts rule/tool labels unless spoiler mode is explicitly unlocked and never returns raw codes. |
+| `app/lib/player-artifacts.ts` | Player-safe digital artifact projection helper that filters artifacts by character, round state, evidence/media dependencies, and unlock events. |
+| `app/lib/player-tools.ts` | Player-facing character tool service that creates party-specific access-code tool instances, projects visible tool codes, lists locked evidence/card/media/artifact prompts, and submits code unlock attempts without storing raw codes. |
+| `app/lib/storage.ts` | Storage provider detection, media upload validation, and local public/private upload writes. |
 
 ### Configuration
 
@@ -158,17 +177,17 @@ Game catalog data is now database-backed:
 3. `/host/create` requires an authenticated user.
 4. The page looks up the published game by slug from PostgreSQL.
 5. Form posts to `createParty()`.
-6. `createParty()` re-checks the current logged-in user, validates the published game, creates a `Party` linked to the published game/version, and creates optional initial `Guest` records in Prisma.
+6. `createParty()` re-checks the current logged-in user, validates the published game, creates a `Party` linked to the published game/version, creates optional initial `Guest` records in Prisma, and queues invitation emails.
 7. Host is redirected to `/host/party/[partyId]`.
 
 ### Party Management
 
 1. `/host/party/[partyId]` requires login.
-2. Page loads party by ID with guests, assignments, rounds, evidence, media, accusations, final reveal state, party result, and recent audit activity.
+2. Page loads party by ID with guests, invitation delivery state, assignments, rounds, evidence, media, accusations, final reveal state, party result, and recent audit activity.
 3. Page verifies `party.hostId === user.id`.
 4. Host can add one guest at a time through `addGuest()`.
 5. Invite link is displayed as `/join?code=INVITECODE`.
-6. Host can approve pending guests, assign/clear characters, resend invites, unlock/start/complete rounds, reveal/hide evidence, reveal/hide victim/final solution content, and complete/reopen a party.
+6. Host can approve pending guests, assign/clear characters, review invitation status/failures, resend invites, unlock spoiler mode, unlock/start/complete rounds, reveal/hide evidence, reveal/hide victim/final solution content, and complete/reopen a party.
 7. Completed parties block gameplay mutations until reopened.
 
 ### Guest Joining
@@ -181,7 +200,23 @@ Game catalog data is now database-backed:
 4. If the email matches an invited guest for that party, that guest is updated.
 5. If no invited guest matches, a pending guest request is created for host approval.
 6. Joined guests receive an HTTP-only `maca_guest` cookie and are redirected to `/play`.
-7. Player-visible cards, evidence, media, accusations, victim reveal, and final reveal content are filtered by assignment, round state, and reveal state.
+7. Player-visible cards, evidence, media, digital artifacts, character tools, locked-content prompts, accusations, victim reveal, and final reveal content are filtered by assignment, round state, reveal state, and conditional unlock events.
+
+### Conditional Reveals
+
+The app now has a foundation for advanced builder-authored unlock mechanics:
+
+1. Authored cards, evidence, and media can store `requiredUnlockRuleId`.
+2. `GameDigitalArtifact`, `GameCharacterTool`, and `GameUnlockRule` describe future builder content and conditional mechanics.
+3. `PartyToolInstance`, `PartyCodeAttempt`, and `PartyUnlockEvent` record party-specific code tools, attempted unlocks, and successful unlocks.
+4. `/play` loads party unlock events and passes the current guest's unlocked rule IDs into player-safe card/evidence/media helpers.
+5. `/play` also shows character-specific access-code generator tools and locked evidence/card/media/artifact code-entry prompts through `app/lib/player-tools.ts`.
+6. `POST /play/unlock` validates player access, CSRF, rate limits, target availability, and access-code hashes before recording successful unlock events for cards, evidence, media, or digital artifacts.
+7. Host party control shows sanitized conditional unlock activity through `app/lib/conditional-activity.ts`.
+8. Player-safe helpers hide conditionally locked content until the actor, assignment, round/reveal state, and unlock state all allow it.
+9. Admin game detail pages include draft-only editors for digital artifacts, character tools, and unlock rules.
+10. Builder editor routes validate CSRF/admin access, save through `app/lib/admin-builder.ts`, and audit create/update events.
+11. Admin builder preview pages use `app/lib/builder-preview.ts` to project visible cards, evidence, media, digital artifacts, and tools as host-safe host, spoiler host, or a selected character.
 
 ## Current Database Model
 
@@ -198,6 +233,9 @@ The current Prisma schema contains:
 - `GameEvidence`
 - `GameMediaAsset`
 - `GameFinalReveal`
+- `GameDigitalArtifact`
+- `GameCharacterTool`
+- `GameUnlockRule`
 - `Product`
 - `Order`
 - `OrderItem`
@@ -211,12 +249,21 @@ The current Prisma schema contains:
 - `PartyFinalRevealState`
 - `PartyAccusation`
 - `PartyResult`
+- `PartyToolInstance`
+- `PartyUnlockEvent`
+- `PartyCodeAttempt`
+- `PartyAssetView`
+- `PartyPlayerInteraction`
+- `PartyPlayerInventory`
 - `OutboundMessage`
 - `SupportTicket`
+- `SupportTicketMessage`
 - `AuditLog`
 - `RateLimitBucket`
 
-Current model coverage is strong enough for the first-party MVP foundation. Still missing or shallow areas include full admin content editors, support reply history, real provider delivery records, upload object metadata beyond seeded assets, fine-grained admin roles, and future marketplace entities.
+`Guest` now carries both party participation status and invitation delivery state: queued/sent/failed status, last queued/sent timestamps, resend count, and last failure detail.
+
+Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, fine-grained admin roles, and future marketplace entities.
 
 ## Current Architectural Assessment
 
@@ -230,7 +277,7 @@ Strengths:
 - Server Actions keep simple auth and party flows compact.
 - Session cookie is HTTP-only and stores only opaque random tokens.
 - Host ownership checks exist on party pages and mutation routes.
-- Game, version, character, round, card, evidence, media, final reveal, party, guest, assignment, accusation, result, order, support, audit, outbound message, webhook, and rate-limit models exist.
+- Game, version, character, round, card, evidence, media, final reveal, builder/conditional, party, guest, assignment, accusation, result, order, support, audit, outbound message, webhook, and rate-limit models exist.
 - CSRF tokens are wired into mutation forms and route handlers, with strict production rejection.
 - Rate limiting protects auth, join, support, and checkout-start flows.
 - Stripe-ready checkout and signed webhook handling exist, but provider credentials are not configured.
@@ -238,10 +285,10 @@ Strengths:
 
 Gaps:
 
-- Admin content editing is still shallow; metadata and draft game creation exist, but full character, round, card, evidence, media, and final reveal editors are still needed.
+- Admin content editing now covers metadata, draft game creation, characters, rounds, cards, evidence, media metadata, digital artifacts, character tools, unlock rules, preview-as-host/character projections, and publish-readiness checks; final reveal editing still needs a dedicated editor.
 - Real payment processing needs Stripe test credentials and dashboard/webhook verification before selling games.
-- Email and SMS records can be queued, failed, and retried, but no real provider adapter is enabled yet.
-- Media upload endpoints are not enabled yet; storage policy helpers exist.
-- Auth still lacks password reset, email verification, account recovery, and session revocation.
+- Email records can be queued, delivered through console dry-run or Resend, failed, and retried. Support replies queue customer emails and internal notes stay local. SMS records can be queued, failed, and retried, but no real SMS provider adapter is enabled yet.
+- Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
+- Auth now has email verification and password reset foundations. It still lacks support/admin recovery procedures, account lockout policy, and admin session revocation tooling.
 - Admin roles are still coarse: `ADMIN` is all-powerful.
-- A dedicated test database and backup automation are still needed before production launch.
+- A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.

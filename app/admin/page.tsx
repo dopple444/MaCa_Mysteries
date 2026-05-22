@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requireUser } from "../lib/auth";
 import { getCsrfToken } from "../lib/csrf";
+import { getStalePendingOrderCutoff } from "../lib/order-maintenance";
 import { prisma } from "../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,14 @@ function getAuditLabel(action: string) {
       return "Final solution hidden";
     case "party.accusation.submitted":
       return "Accusation submitted";
+    case "payment.orders.stalePendingCancelled":
+      return "Stale pending orders cancelled";
+    case "payment.orders.paidAccessReconciled":
+      return "Paid order access reconciled";
+    case "payment.order.accessReconciled":
+      return "Order access reconciled";
+    case "outbound.email.deliveryRun":
+      return "Email delivery run";
     default:
       return action.replaceAll(".", " ");
   }
@@ -70,8 +79,20 @@ export default async function AdminPage({
   const webhookEventWhere = {
     ...(webhookStatus ? { status: webhookStatus } : {})
   };
+  const stalePendingOrderCutoff = getStalePendingOrderCutoff();
 
-  const [games, totals, auditLogs, recentOrders, outboundMessages, supportTickets, webhookEvents] = await Promise.all([
+  const [
+    games,
+    totals,
+    auditLogs,
+    recentOrders,
+    outboundMessages,
+    supportTickets,
+    webhookEvents,
+    stalePendingOrderCount,
+    paidOrderCount,
+    failedWebhookEventCount
+  ] = await Promise.all([
     prisma.game.findMany({
       orderBy: { title: "asc" },
       include: {
@@ -190,7 +211,15 @@ export default async function AdminPage({
           }
         }
       }
-    })
+    }),
+    prisma.order.count({
+      where: {
+        status: "PENDING",
+        createdAt: { lt: stalePendingOrderCutoff }
+      }
+    }),
+    prisma.order.count({ where: { status: "PAID" } }),
+    prisma.paymentWebhookEvent.count({ where: { status: "FAILED" } })
   ]);
 
   const [
@@ -237,12 +266,18 @@ export default async function AdminPage({
         <p className="mt-3 max-w-3xl text-slate-300">
           Read-only inventory for first-party game content and current play data.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 flex flex-wrap gap-3">
           <Link
             href="/admin/games/new"
             className="inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-400"
           >
             Create game
+          </Link>
+          <Link
+            href="/admin/media/uploads"
+            className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
+          >
+            Upload media
           </Link>
         </div>
 
@@ -254,6 +289,44 @@ export default async function AdminPage({
             </div>
           ))}
         </div>
+
+        <section className="mt-8 rounded-3xl border border-white/10 bg-slate-950/80 p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Payment operations</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Maintenance actions are idempotent and audit logged for Stripe test and production operations.
+              </p>
+            </div>
+            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+              {failedWebhookEventCount} failed hooks
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <form action="/admin/orders/maintenance" method="post" className="rounded-2xl bg-slate-900/80 p-4">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="operation" value="cancel-stale-pending" />
+              <p className="text-sm font-semibold text-white">Stale pending checkouts</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {stalePendingOrderCount} pending order{stalePendingOrderCount === 1 ? "" : "s"} older than 24 hours.
+              </p>
+              <button className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white">
+                Cancel stale pending
+              </button>
+            </form>
+            <form action="/admin/orders/maintenance" method="post" className="rounded-2xl bg-slate-900/80 p-4">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="operation" value="reconcile-paid-access" />
+              <p className="text-sm font-semibold text-white">Paid access reconciliation</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Recheck {paidOrderCount} paid order{paidOrderCount === 1 ? "" : "s"} and repair any missing game access.
+              </p>
+              <button className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white">
+                Reconcile paid access
+              </button>
+            </form>
+          </div>
+        </section>
 
         <div className="mt-10 space-y-4">
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
@@ -345,9 +418,17 @@ export default async function AdminPage({
             <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl font-semibold text-white">Outbound messages</h2>
-                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
-                  {outboundMessages.length} shown
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action="/admin/outbound/deliver" method="post">
+                    <input type="hidden" name="csrfToken" value={csrfToken} />
+                    <button className="rounded-full border border-white/20 px-3 py-2 text-xs font-semibold text-white hover:border-white">
+                      Send pending email
+                    </button>
+                  </form>
+                  <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                    {outboundMessages.length} shown
+                  </span>
+                </div>
               </div>
               <form className="mt-4 grid gap-3 sm:grid-cols-3">
                 <select

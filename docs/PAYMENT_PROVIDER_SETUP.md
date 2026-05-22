@@ -88,6 +88,32 @@ Stripe payment provider settings look ready.
 
 The current local setup has passed this check.
 
+## Restart Local App And Webhook Listener
+
+Use this pair when the app cannot be reached or after `.env` payment changes:
+
+```bash
+tmux kill-session -t maca-mysteries 2>/dev/null || true
+rm -rf .next
+tmux new-session -d -s maca-mysteries
+tmux send-keys -t maca-mysteries 'cd /home/dopple444/projects/MaCa_Mysteries && npm run dev -- -H 0.0.0.0 -p 3001' C-m
+```
+
+Restart the Stripe webhook listener:
+
+```bash
+tmux kill-session -t maca-stripe-listener 2>/dev/null || true
+tmux new-session -d -s maca-stripe-listener
+tmux send-keys -t maca-stripe-listener 'cd /home/dopple444/projects/MaCa_Mysteries && npm run stripe:listen' C-m
+```
+
+Then verify:
+
+```bash
+curl -I http://127.0.0.1:3001/games
+tmux ls
+```
+
 ## Test Checkout
 
 1. Make sure the dev server is running at `http://192.168.2.45:3001`.
@@ -109,6 +135,18 @@ Latest sandbox result:
 - Webhook route returned `200`.
 - Local order status changed to `PAID`.
 - `UserGameAccess` was created for Murder at Hollow Lake.
+
+## Payment Maintenance
+
+Admin payment operations now exist for common test and production-support cases:
+
+- `Admin > Payment operations > Cancel stale pending`: marks `PENDING` orders older than 24 hours as `CANCELLED`.
+- `Admin > Payment operations > Reconcile paid access`: reruns paid-order fulfillment and repairs missing `UserGameAccess` records.
+- `Admin > Orders > Order detail > Reconcile access`: reruns fulfillment for one paid order.
+
+These operations are idempotent and audit logged. They are intended for abandoned Stripe Checkout sessions and webhook/fulfillment recovery, not refunds.
+
+Checkout/session failures are marked on the local `Order` as `FAILED`. Stripe webhook processing failures are marked on `PaymentWebhookEvent` as `FAILED`. Both paths emit structured payment logs to the app server output without printing Stripe keys or webhook secrets.
 
 ## Production Notes
 

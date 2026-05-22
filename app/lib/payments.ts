@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
+import { getAppBaseUrl } from "./app-url";
 import { prisma } from "./prisma";
+import { logPaymentEvent } from "./server-logging";
 
 type EnvMap = Partial<Record<string, string | undefined>>;
 
@@ -53,12 +55,6 @@ export function getPaymentProvider(env: EnvMap = process.env) {
   return env.PAYMENT_PROVIDER?.trim().toLowerCase() || null;
 }
 
-function getAppBaseUrl(requestUrl: string, env: EnvMap) {
-  const configured = env.APP_URL?.trim();
-  if (configured) return configured.replace(/\/$/, "");
-  return new URL(requestUrl).origin;
-}
-
 function getStripeSecretKey(env: EnvMap) {
   return env.STRIPE_SECRET_KEY?.trim() || null;
 }
@@ -67,6 +63,24 @@ function getStringField(value: unknown, field: string) {
   if (!value || typeof value !== "object" || !(field in value)) return "";
   const result = (value as Record<string, unknown>)[field];
   return typeof result === "string" ? result : "";
+}
+
+async function markCheckoutOrderFailed(orderId: string, provider: string, reason: string) {
+  await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      status: "PENDING"
+    },
+    data: {
+      status: "FAILED",
+      paymentProvider: provider
+    }
+  });
+  logPaymentEvent("warn", "checkout.session.failed", {
+    orderId,
+    provider: provider || "none",
+    reason
+  });
 }
 
 export async function createPendingOrderForProduct(input: CreatePendingOrderInput) {
@@ -117,6 +131,7 @@ export async function createPaymentCheckoutSession(input: CreatePaymentCheckoutS
   const env = input.env ?? process.env;
   const provider = getPaymentProvider(env);
   if (provider !== "stripe") {
+    await markCheckoutOrderFailed(input.order.id, provider ?? "", "provider_not_configured");
     return {
       status: "NOT_CONFIGURED" as const,
       orderId: input.order.id,
@@ -126,6 +141,7 @@ export async function createPaymentCheckoutSession(input: CreatePaymentCheckoutS
 
   const secretKey = getStripeSecretKey(env);
   if (!secretKey) {
+    await markCheckoutOrderFailed(input.order.id, "stripe", "missing_stripe_secret_key");
     return {
       status: "NOT_CONFIGURED" as const,
       orderId: input.order.id,
@@ -159,10 +175,12 @@ export async function createPaymentCheckoutSession(input: CreatePaymentCheckoutS
   });
 
   if (!response.ok) {
+    const message = await response.text();
+    await markCheckoutOrderFailed(input.order.id, "stripe", `stripe_response_${response.status}`);
     return {
       status: "FAILED" as const,
       orderId: input.order.id,
-      message: await response.text()
+      message
     };
   }
 
@@ -170,6 +188,7 @@ export async function createPaymentCheckoutSession(input: CreatePaymentCheckoutS
   const sessionId = getStringField(payload, "id");
   const url = getStringField(payload, "url");
   if (!sessionId || !url) {
+    await markCheckoutOrderFailed(input.order.id, "stripe", "stripe_missing_checkout_url");
     return {
       status: "FAILED" as const,
       orderId: input.order.id,
@@ -183,6 +202,12 @@ export async function createPaymentCheckoutSession(input: CreatePaymentCheckoutS
       paymentProvider: "stripe",
       paymentReference: sessionId
     }
+  });
+
+  logPaymentEvent("info", "checkout.session.created", {
+    orderId: input.order.id,
+    provider: "stripe",
+    sessionId
   });
 
   return {

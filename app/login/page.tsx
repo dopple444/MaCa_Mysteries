@@ -2,7 +2,11 @@ import Link from "next/link";
 import { login } from "../lib/auth-actions";
 import { getCsrfToken } from "../lib/csrf";
 
-export default async function LoginPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
+export default async function LoginPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ error?: string; verified?: string; reset?: string }>;
+}) {
   const params = await searchParams;
   const csrfToken = await getCsrfToken();
   return (
@@ -16,6 +20,16 @@ export default async function LoginPage({ searchParams }: { searchParams?: Promi
         )}
         {params?.error === "rate-limited" && (
           <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">Too many sign-in attempts. Please wait and try again.</p>
+        )}
+        {params?.verified === "1" && (
+          <p className="mt-4 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            Email verified. Sign in to continue.
+          </p>
+        )}
+        {params?.reset === "success" && (
+          <p className="mt-4 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            Password reset. Sign in with your new password.
+          </p>
         )}
 
         <form action={login} className="mt-8 grid gap-4">
@@ -43,6 +57,9 @@ export default async function LoginPage({ searchParams }: { searchParams?: Promi
 
         <p className="mt-6 text-sm text-slate-400">
           New host? <Link href="/signup" className="text-indigo-300 hover:text-white">Create an account</Link>.
+        </p>
+        <p className="mt-2 text-sm text-slate-400">
+          Forgot your password? <Link href="/forgot-password" className="text-indigo-300 hover:text-white">Reset it</Link>.
         </p>
       </div>
     </div>

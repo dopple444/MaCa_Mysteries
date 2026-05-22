@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { addGuest, approveGuest } from "../../../lib/party-actions";
 import { requireUser } from "../../../lib/auth";
+import { getPartyConditionalActivity } from "../../../lib/conditional-activity";
 import { getCsrfToken } from "../../../lib/csrf";
 import { prisma } from "../../../lib/prisma";
 
@@ -32,6 +33,34 @@ function getGuestStatusClass(status: string) {
   }
 }
 
+function getInvitationStatusLabel(status: string) {
+  switch (status) {
+    case "SENT":
+      return "Invite sent";
+    case "QUEUED":
+      return "Invite queued";
+    case "FAILED":
+      return "Invite failed";
+    case "NOT_SENT":
+      return "Invite not sent";
+    default:
+      return status.replaceAll("_", " ");
+  }
+}
+
+function getInvitationStatusClass(status: string) {
+  switch (status) {
+    case "SENT":
+      return "bg-emerald-500/10 text-emerald-200";
+    case "QUEUED":
+      return "bg-indigo-500/10 text-indigo-200";
+    case "FAILED":
+      return "bg-rose-500/10 text-rose-200";
+    default:
+      return "bg-slate-800 text-slate-300";
+  }
+}
+
 function getRoundStatusClass(status: string) {
   switch (status) {
     case "ACTIVE":
@@ -43,6 +72,32 @@ function getRoundStatusClass(status: string) {
     default:
       return "bg-slate-800 text-slate-300";
   }
+}
+
+function getCodeAttemptStatusClass(status: string) {
+  switch (status) {
+    case "SUCCESS":
+      return "bg-emerald-500/10 text-emerald-200";
+    case "FAILED":
+      return "bg-rose-500/10 text-rose-200";
+    default:
+      return "bg-slate-800 text-slate-300";
+  }
+}
+
+function getCodeAttemptStatusLabel(status: string) {
+  switch (status) {
+    case "SUCCESS":
+      return "Unlocked";
+    case "FAILED":
+      return "Failed";
+    default:
+      return status.replaceAll("_", " ");
+  }
+}
+
+function getUnlockScopeLabel(scope: string) {
+  return scope.replaceAll("_", " ").toLowerCase();
 }
 
 function getAuditLabel(action: string) {
@@ -69,6 +124,8 @@ function getAuditLabel(action: string) {
       return "Final solution shown";
     case "party.finalReveal.solutionHidden":
       return "Final solution hidden";
+    case "party.spoilerMode.unlocked":
+      return "Host spoiler mode unlocked";
     case "party.accusation.submitted":
       return "Accusation submitted";
     default:
@@ -78,6 +135,17 @@ function getAuditLabel(action: string) {
 
 function formatActivityTime(date: Date) {
   return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function getInvitationTimeLabel(guest: {
+  invitationLastSentAt: Date | null;
+  invitationLastQueuedAt: Date | null;
+  invitationFailedAt: Date | null;
+}) {
+  if (guest.invitationLastSentAt) return `Last sent ${formatActivityTime(guest.invitationLastSentAt)}`;
+  if (guest.invitationFailedAt) return `Failed ${formatActivityTime(guest.invitationFailedAt)}`;
+  if (guest.invitationLastQueuedAt) return `Queued ${formatActivityTime(guest.invitationLastQueuedAt)}`;
+  return "No invitation email queued yet";
 }
 
 export default async function PartyPage({ params }: { params: Promise<{ partyId: string }> }) {
@@ -230,6 +298,21 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
   );
   const isCompleted = party.status === "COMPLETED";
   const finalSolutionRevealed = Boolean(party.finalRevealState?.finalRevealedAt);
+  const hostSpoilerModeUnlocked = Boolean(party.hostSpoilerUnlockedAt);
+  const conditionalActivity =
+    (await getPartyConditionalActivity({
+      partyId: party.id,
+      hostId: user.id,
+      includeSpoilers: hostSpoilerModeUnlocked,
+      take: 6
+    })) ?? {
+      counts: {
+        codeAttempts: 0,
+        unlockEvents: 0
+      },
+      codeAttempts: [],
+      unlockEvents: []
+    };
   const revealStatus = party.finalRevealState?.finalRevealedAt
     ? "Solution revealed"
     : party.finalRevealState?.victimRevealedAt
@@ -246,7 +329,17 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
     ["Current round", activeRound?.gameRound.title ?? "Not started", activeRound?.status ?? "Waiting"],
     ["Evidence", `${party.evidenceReveals.length}/${evidenceList.length}`, "Revealed to players"],
     ["Accusations", `${party.accusations.length}`, roundThreeStarted ? "Open or reviewing" : "Locked"],
-    ["Reveal", revealStatus, roundThreeStarted ? "Final controls available" : "Waiting for later rounds"]
+    ["Reveal", revealStatus, roundThreeStarted ? "Final controls available" : "Waiting for later rounds"],
+    [
+      "Conditional unlocks",
+      `${conditionalActivity.counts.unlockEvents} unlocked`,
+      `${conditionalActivity.counts.codeAttempts} code attempts`
+    ],
+    [
+      "Host spoilers",
+      hostSpoilerModeUnlocked ? "Unlocked" : "Locked",
+      hostSpoilerModeUnlocked ? "Full host view enabled" : "Spoiler-safe by default"
+    ]
   ];
 
   function countCardsByVisibility(roundState: (typeof roundStates)[number], visibility: string) {
@@ -320,18 +413,67 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
           </div>
         </div>
 
+        <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/80 p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Host spoiler mode</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {hostSpoilerModeUnlocked
+                  ? `Unlocked ${party.hostSpoilerUnlockedAt ? formatActivityTime(party.hostSpoilerUnlockedAt) : "for this party"}.`
+                  : "Spoiler-protected media and final solution details are hidden from this host view."}
+              </p>
+            </div>
+            {hostSpoilerModeUnlocked ? (
+              <span className="rounded-full bg-rose-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-200">
+                Spoilers unlocked
+              </span>
+            ) : (
+              <form action={`/host/party/${party.id}/spoiler-mode`} method="post" className="rounded-2xl bg-slate-900/80 p-4">
+                <input type="hidden" name="csrfToken" value={csrfToken} />
+                <label className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+                  <input name="confirmSpoilerMode" type="checkbox" className="mt-1 h-4 w-4 accent-rose-500" />
+                  Unlock protected host spoilers
+                </label>
+                <button className="mt-4 rounded-full bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-400">
+                  Unlock spoiler mode
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+
         <div className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="space-y-6">
             <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
               <h2 className="text-xl font-semibold text-white">Guests</h2>
               <div className="mt-4 space-y-3 text-sm text-slate-300">
                 {party.guests.length ? (
-                  party.guests.map((guest) => (
+                  party.guests.map((guest) => {
+                    const invitationButtonLabel =
+                      guest.invitationStatus === "FAILED" ? "Resend failed invite" : "Resend invite";
+
+                    return (
                     <div key={guest.id} className="rounded-2xl bg-slate-900/80 p-4">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="font-semibold text-white">{guest.name || "Unnamed guest"}</p>
                           <p className="mt-1 text-slate-400">{guest.email}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                            <span className={`rounded-full px-3 py-1 uppercase tracking-[0.2em] ${getInvitationStatusClass(guest.invitationStatus)}`}>
+                              {getInvitationStatusLabel(guest.invitationStatus)}
+                            </span>
+                            <span className="text-slate-500">{getInvitationTimeLabel(guest)}</span>
+                            {guest.invitationResendCount > 0 && (
+                              <span className="text-slate-500">
+                                Resent {guest.invitationResendCount} time{guest.invitationResendCount === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </div>
+                          {guest.invitationStatus === "FAILED" && guest.invitationFailureDetail && (
+                            <p className="mt-2 text-xs leading-5 text-rose-200">
+                              Delivery issue: {guest.invitationFailureDetail}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                           <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${getGuestStatusClass(guest.status)}`}>
@@ -352,14 +494,15 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
                               <input type="hidden" name="csrfToken" value={csrfToken} />
                               <input type="hidden" name="guestId" value={guest.id} />
                               <button className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:border-white">
-                                Resend invite
+                                {invitationButtonLabel}
                               </button>
                             </form>
                           )}
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p>No guests invited yet.</p>
                 )}
@@ -480,7 +623,7 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
                               )}
                             </div>
                             <p className="mt-3 leading-6 text-slate-400">
-                              {isSpoilerProtected
+                              {isSpoilerProtected && !hostSpoilerModeUnlocked
                                 ? "Spoiler-protected evidence body is hidden until dedicated final reveal controls are added."
                                 : evidence.body}
                             </p>
@@ -542,49 +685,60 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
               </div>
               <div className="mt-4 space-y-3 text-sm text-slate-300">
                 {mediaAssets.length ? (
-                  mediaAssets.map((media) => (
-                    <article key={media.id} className="rounded-2xl bg-slate-900/80 p-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-white">{media.title}</p>
-                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
-                          {media.assetType}
-                        </span>
-                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
-                          {media.visibility.replaceAll("_", " ")}
-                        </span>
-                        {media.gameRound && (
+                  mediaAssets.map((media) => {
+                    const isSpoilerProtected = media.visibility === "SPOILER_PROTECTED";
+                    const showMedia = !isSpoilerProtected || hostSpoilerModeUnlocked;
+
+                    return (
+                      <article key={media.id} className="rounded-2xl bg-slate-900/80 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-white">
+                            {showMedia ? media.title : "Spoiler-protected media"}
+                          </p>
                           <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
-                            {media.gameRound.title}
+                            {showMedia ? media.assetType : "LOCKED"}
                           </span>
-                        )}
-                        {media.character && (
                           <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
-                            {media.character.name}
+                            {media.visibility.replaceAll("_", " ")}
                           </span>
+                          {showMedia && media.gameRound && (
+                            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+                              {media.gameRound.title}
+                            </span>
+                          )}
+                          {showMedia && media.character && (
+                            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+                              {media.character.name}
+                            </span>
+                          )}
+                        </div>
+                        {showMedia && media.description && <p className="mt-3 leading-6 text-slate-400">{media.description}</p>}
+                        {showMedia && media.evidence && (
+                          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                            Related evidence: {media.evidence.title}
+                          </p>
                         )}
-                      </div>
-                      {media.description && <p className="mt-3 leading-6 text-slate-400">{media.description}</p>}
-                      {media.evidence && (
-                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                          Related evidence: {media.evidence.title}
-                        </p>
-                      )}
-                      {media.assetType === "IMAGE" ? (
-                        <img
-                          src={media.url}
-                          alt={media.title}
-                          className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950"
-                        />
-                      ) : (
-                        <a
-                          href={media.url}
-                          className="mt-4 inline-flex rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:border-white"
-                        >
-                          Open media
-                        </a>
-                      )}
-                    </article>
-                  ))
+                        {!showMedia ? (
+                          <p className="mt-3 leading-6 text-slate-400">
+                            This asset is hidden until host spoiler mode is unlocked.
+                          </p>
+                        ) : media.assetType === "IMAGE" ? (
+                          <img
+                            src={media.url}
+                            alt={media.title}
+                            className="mt-4 w-full rounded-2xl border border-white/10 bg-slate-950"
+                          />
+                        ) : (
+                          <a
+                            href={media.url}
+                            className="mt-4 inline-flex rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:border-white"
+                          >
+                            Open media
+                          </a>
+                        )}
+                      </article>
+                    );
+                  })
                 ) : (
                   <p>No media assets have been added for this game version yet.</p>
                 )}
@@ -649,17 +803,23 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
               </div>
               {party.finalRevealState ? (
                 <div className="mt-4 rounded-2xl bg-slate-900/80 p-4 text-sm text-slate-300">
-                  <h3 className="text-lg font-semibold text-white">{party.finalRevealState.finalReveal.title}</h3>
+                  <h3 className="text-lg font-semibold text-white">
+                    {hostSpoilerModeUnlocked ||
+                    party.finalRevealState.victimRevealedAt ||
+                    party.finalRevealState.finalRevealedAt
+                      ? party.finalRevealState.finalReveal.title
+                      : "Final reveal"}
+                  </h3>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-slate-950/80 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Victim</p>
                       <p className="mt-2 font-semibold text-white">
-                        {party.finalRevealState.victimRevealedAt
+                        {hostSpoilerModeUnlocked || party.finalRevealState.victimRevealedAt
                           ? party.finalRevealState.finalReveal.victimCharacter?.name ?? "Unassigned victim"
                           : "Hidden"}
                       </p>
                       <p className="mt-2 leading-6 text-slate-400">
-                        {party.finalRevealState.victimRevealedAt
+                        {hostSpoilerModeUnlocked || party.finalRevealState.victimRevealedAt
                           ? party.finalRevealState.finalReveal.victimRevealText
                           : "Reveal only after the murder round starts."}
                       </p>
@@ -667,18 +827,18 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
                     <div className="rounded-2xl bg-slate-950/80 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Killer</p>
                       <p className="mt-2 font-semibold text-white">
-                        {party.finalRevealState.finalRevealedAt
+                        {hostSpoilerModeUnlocked || party.finalRevealState.finalRevealedAt
                           ? party.finalRevealState.finalReveal.killerCharacter?.name ?? "Unassigned killer"
                           : "Hidden"}
                       </p>
                       <p className="mt-2 leading-6 text-slate-400">
-                        {party.finalRevealState.finalRevealedAt
+                        {hostSpoilerModeUnlocked || party.finalRevealState.finalRevealedAt
                           ? party.finalRevealState.finalReveal.killerRevealText
                           : "Killer identity remains locked until final reveal."}
                       </p>
                     </div>
                   </div>
-                  {party.finalRevealState.finalRevealedAt && (
+                  {(hostSpoilerModeUnlocked || party.finalRevealState.finalRevealedAt) && (
                     <div className="mt-4 space-y-3 rounded-2xl bg-slate-950/80 p-4">
                       <p className="leading-6 text-slate-300">
                         <span className="font-semibold text-white">Solution:</span>{" "}
@@ -852,6 +1012,80 @@ export default async function PartyPage({ params }: { params: Promise<{ partyId:
                 Add guest
               </button>
             </form>
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xl font-semibold text-white">Conditional unlock activity</h2>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                  {conditionalActivity.counts.unlockEvents} unlocked
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-900/80 p-4">
+                  <p className="text-slate-400">Unlock events</p>
+                  <p className="mt-1 font-semibold text-white">{conditionalActivity.counts.unlockEvents}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-900/80 p-4">
+                  <p className="text-slate-400">Code attempts</p>
+                  <p className="mt-1 font-semibold text-white">{conditionalActivity.counts.codeAttempts}</p>
+                </div>
+              </div>
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Recent unlocks</h3>
+                <div className="mt-3 space-y-3 text-sm text-slate-300">
+                  {conditionalActivity.unlockEvents.length ? (
+                    conditionalActivity.unlockEvents.map((event) => (
+                      <div key={event.id} className="rounded-2xl bg-slate-900/80 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200">
+                            {event.status}
+                          </span>
+                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+                            {event.targetTypeLabel}
+                          </span>
+                        </div>
+                        <p className="mt-3 font-semibold text-white">{event.ruleLabel}</p>
+                        <p className="mt-1 leading-6 text-slate-400">
+                          {event.actorLabel} unlocked for {event.targetGuestLabel}.
+                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                          {formatActivityTime(event.createdAt)} · Scope {getUnlockScopeLabel(event.unlockScope)}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No conditional content has been unlocked yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Recent code attempts</h3>
+                <div className="mt-3 space-y-3 text-sm text-slate-300">
+                  {conditionalActivity.codeAttempts.length ? (
+                    conditionalActivity.codeAttempts.map((attempt) => (
+                      <div key={attempt.id} className="rounded-2xl bg-slate-900/80 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${getCodeAttemptStatusClass(attempt.status)}`}>
+                            {getCodeAttemptStatusLabel(attempt.status)}
+                          </span>
+                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+                            {attempt.targetTypeLabel}
+                          </span>
+                        </div>
+                        <p className="mt-3 font-semibold text-white">{attempt.ruleLabel}</p>
+                        <p className="mt-1 leading-6 text-slate-400">
+                          {attempt.actorLabel} used {attempt.toolLabel}.
+                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                          {formatActivityTime(attempt.createdAt)} · Scope {getUnlockScopeLabel(attempt.unlockScope)}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No access-code attempts have been recorded yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="mt-8 border-t border-white/10 pt-6">
               <h2 className="text-xl font-semibold text-white">Recent activity</h2>
               <div className="mt-4 space-y-3 text-sm text-slate-300">

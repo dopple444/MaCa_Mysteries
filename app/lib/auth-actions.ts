@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createSession, clearSession, hashPassword, verifyPassword } from "./auth";
+import { queueEmailVerificationMessage } from "./account-security";
 import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
 import { checkRateLimit } from "./rate-limit";
@@ -39,7 +40,8 @@ export async function login(formData: FormData) {
   }
 
   await createSession(user.id);
-  redirect("/dashboard");
+  await queueEmailVerificationMessage(user.id);
+  redirect("/account/verify-email?sent=1");
 }
 
 export async function signup(formData: FormData) {

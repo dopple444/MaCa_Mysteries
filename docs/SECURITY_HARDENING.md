@@ -1,6 +1,6 @@
 # Security Hardening Checklist
 
-Last updated: 2026-05-19
+Last updated: 2026-05-22
 
 This checklist captures the current security posture and the next hardening moves before the app is exposed as a production service.
 
@@ -11,23 +11,31 @@ This checklist captures the current security posture and the next hardening move
 - `/admin` requires `ADMIN` role and returns 404 for non-admin users.
 - Guest play access uses guest tokens and redirects invalid cookies instead of mutating cookies during render.
 - Player card, evidence, media, accusation, victim reveal, and final reveal content are filtered through server-side visibility rules.
-- Audit logs record core host, player, admin content, support, party status, invite resend, and outbound retry mutations.
+- Conditional reveal checks hide cards/evidence/media that require unlock rules until the current player has an authorized unlock event.
+- Access-code tool instances and attempts store salted hashes instead of raw codes.
+- Player code-entry is CSRF-protected, rate-limited, validates target availability server-side, and redirects through generic status messages.
+- Host conditional activity monitoring redacts rule/tool labels until host spoiler mode is unlocked and never returns stored code hashes.
+- Audit logs record core host, player, admin content, support, party status, invite resend, spoiler unlock, and outbound retry mutations.
+- Guest invitation delivery state is server-side and does not expose gameplay spoilers.
 - Database-backed rate limiting is active for login, signup, guest join, support ticket intake, and checkout-start.
+- Email verification and password reset use signed account-action links delivered through queued email.
 - CSRF tokens are wired into mutation forms and route handlers. Missing tokens remain permissive in development/test, but production rejects missing or invalid tokens.
 - Checkout can create pending orders and Stripe checkout sessions when configured.
 - Stripe webhook signature verification and idempotent webhook event storage are implemented.
 - Payment fulfillment is idempotent and grants `UserGameAccess` from paid orders.
-- Upload validation helpers enforce allowed MIME types and size limits before uploads are enabled.
+- Local admin upload routes enforce allowed MIME types, size limits, and public/private path separation.
 
 ## High-Priority Gaps
 
 1. Production CSRF secret.
    - Set `CSRF_SECRET` before production.
    - Keep the production missing-token rejection behavior.
-   - Add browser-level regression tests around invalid tokens once the app has a dedicated test database.
+   - Add browser-level regression tests around invalid tokens now that the app has a dedicated test database.
 
 2. Account lifecycle.
-   - Add email verification, password reset, and account recovery.
+   - Email verification and password reset foundations are implemented.
+   - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
+   - Add admin recovery tooling before support staff handle real accounts.
    - Add session revocation tooling for admins/support.
    - Consider session rotation after login and sensitive account changes.
 
@@ -45,26 +53,35 @@ This checklist captures the current security posture and the next hardening move
    - Continue testing player-safe visibility helpers.
    - Avoid rendering spoiler-protected body text in host-safe views unless spoiler mode exists and is intentionally unlocked.
    - Keep admin pages restricted because they expose full game content.
+   - Keep conditional unlock logic in shared server-side services so future digital artifacts and tools do not bypass player-safe filters.
 
-6. File and media safety.
-   - Upload storage is not enabled yet.
-   - Before uploads, add malware scanning, private object storage paths, signed URLs, and admin review workflow.
+6. Conditional unlock abuse.
+   - Player code-entry now has guest-scoped rate limiting; keep tuning limits as real gameplay patterns appear.
+   - Keep raw codes out of logs, database records, and user-visible error messages.
+   - Host-side unlock monitoring exists; add admin/global monitoring and suspicious-attempt alerts.
+   - Admin builder editor services now validate version-owned targets/source tools and require access-code rules to use access-code generator tools.
+   - Publish validation now blocks missing essential content, orphan required unlock rules, unpublished required rules, unattached published rules, and access-code rules without generator tools.
+   - Expand publish validation for circular dependencies, spoiler wording, asset-view rules, host-approval rules, reveal-state rules, and multi-player interaction rules.
 
-7. Database backups and restore drills.
+7. File and media safety.
+   - Local admin uploads are enabled for trusted admins.
+   - Before production uploads, add malware scanning, S3-compatible object storage writes, signed URLs for private files, and admin review workflow.
+
+8. Database backups and restore drills.
    - Use timestamped backups before risky migrations.
    - Practice restoring to a separate database.
    - Never test restore procedures first on the live database.
 
-8. Error handling and logs.
+9. Error handling and logs.
    - Avoid leaking stack traces to users in production.
    - Add structured server logs for auth failures, checkout attempts, webhook failures, support requests, and admin actions.
 
-9. Admin scope.
+10. Admin scope.
    - Admin pages expose spoiler content and platform activity.
    - Add separate admin roles later: support, content editor, finance, super admin.
-   - Add status history/threaded notes for support when email replies are implemented.
+   - Add status history automation for support as volume grows.
 
-10. Abuse prevention.
+11. Abuse prevention.
    - Add CAPTCHA or challenge flow only if rate limits are not enough.
    - Add suspicious invite-code attempt monitoring.
    - Add outbound message throttles before enabling real email/SMS delivery.
@@ -74,9 +91,10 @@ This checklist captures the current security posture and the next hardening move
 | Route | Current Risk | Next Hardening |
 | --- | --- | --- |
 | `/login` | Brute force attempts | Rate limit is active; add login audit events and account lockout policy later |
-| `/signup` | Spam accounts | Rate limit is active; add email verification |
+| `/signup` | Spam accounts | Rate limit is active and signup queues email verification |
 | `/join` | Invite-code guessing | Rate limit is active; add suspicious attempt audit events |
 | `/play` | Guest token misuse | Token rotation/reissue flow later |
+| `/play/unlock` | Brute force or spoiler probing | Guest-scoped rate limiting, CSRF, raw-code hashing, target checks, and host activity monitoring are active; add admin/global monitoring and suspicious-attempt alerts |
 | `/host/party/[partyId]/*` | Unauthorized mutation | Ownership checks and CSRF are active; add more mutation-specific tests |
 | `/checkout/start` | Payment abuse | Rate limit, CSRF, pending orders, and Stripe checkout foundation are active |
 | `/api/webhooks/payments/stripe` | Spoofed payment events | Stripe HMAC signature verification and idempotency are active |
@@ -89,6 +107,7 @@ This checklist captures the current security posture and the next hardening move
 - `NODE_ENV`
 - `APP_URL`
 - `CSRF_SECRET`
+- `ACCOUNT_TOKEN_SECRET`
 - `PAYMENT_PROVIDER`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
@@ -100,8 +119,10 @@ This checklist captures the current security posture and the next hardening move
 
 ## Recommended Next Code Changes
 
-1. Add email verification and password reset.
-2. Add dedicated test database setup and fixture cleanup scripts.
+1. Add admin account recovery and session revocation tooling.
+2. Expand dedicated test database coverage with more browser-level mutation tests.
 3. Add structured logging for webhook, support, auth, and admin events.
-4. Add outbound email delivery adapter after choosing Resend, Postmark, SendGrid, SES, or another provider.
-5. Add role-specific admin permissions before hiring support/content staff.
+4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
+5. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
+6. Add admin/global monitoring for code attempts and unlock events.
+7. Add role-specific admin permissions before hiring support/content staff.

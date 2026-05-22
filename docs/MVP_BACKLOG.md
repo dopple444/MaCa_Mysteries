@@ -1,6 +1,6 @@
 # MVP Backlog
 
-Last inspected: 2026-05-17
+Last inspected: 2026-05-21
 
 ## Product Focus
 
@@ -47,8 +47,10 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 - As an admin, I can create and edit first-party games so Burnett Games can publish original content.
 - As an admin, I can version game content so live parties are not changed by future edits.
 - As an admin, I can mark games and versions as draft, published, retired, or archived.
-- As an admin, I can preview content as public visitor, host-safe host, spoiler host, and assigned player so I can check access rules.
+- As an admin, I can preview content as public visitor later, host-safe host, spoiler host, and assigned player so I can check access rules.
 - As an admin, I can upload or attach media assets so games can include rich clues.
+- As an admin, I can create and edit conditional reveal rules, digital artifacts, and character tools so advanced game mechanics can be reviewed before publishing.
+- As an admin, I can run publish-readiness validation before publishing so missing required content and unsafe conditional unlock wiring are caught.
 
 ## Should Have
 
@@ -70,6 +72,7 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 - As a host, I can auto-assign characters so setup is faster.
 - As a host, I can print or export key host-safe materials for in-person backup.
 - As a host, I can pause and resume a party so real-life interruptions do not break the game.
+- As a host, I can see non-spoiler progress for locked evidence and collaborative unlocks so I can run the party without learning the solution.
 
 ### Player
 
@@ -77,12 +80,13 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 - As a player, I can view public party information so I know event details.
 - As a player, I can review previous round cards after a new round opens.
 - As a player, I can view shared evidence as it is revealed.
+- As a player, I can unlock character-specific evidence only after the game rule allows it so collaborative mechanics feel fair and spoiler-safe.
 
 ### Admin
 
-- As an admin, I can validate a game version before publishing so missing required content is caught.
 - As an admin, I can duplicate a game version so edits can start from the previous published version.
 - As an admin, I can view audit logs for spoiler unlocks, publishing, and payment events.
+- As an admin, I can run deeper conditional-rule QA reports for circular dependencies, spoiler wording, asset-view triggers, host-approval triggers, reveal-state triggers, and multi-player interaction rules.
 
 ## Could Have
 
@@ -108,19 +112,22 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 - As a player, I can receive optional email/SMS reminders when a party starts or a round unlocks.
 - As a player, I can save notes during investigation.
 - As a player, I can view a personal clue notebook.
+- As a player, I can use a character-specific digital tool to help another player unlock evidence.
+- As a player, I can enter a party-specific code and see whether it unlocks the intended clue.
 
 ### Admin
 
 - As an admin, I can see basic analytics for game purchases and party completion.
 - As an admin, I can manage support tickets.
 - As an admin, I can run content QA reports for spoiler risk and missing media.
+- As an admin, I can run conditional-rule QA reports for orphan targets, impossible unlocks, and unused character tools.
 
 ## Later / Marketplace
 
 ### Future Creator
 
 - As a creator, I can apply for a creator profile so I can submit games.
-- As a creator, I can draft a game in the editor so I can build a mystery.
+- As a creator, I can draft a game in the builder so I can build a mystery without coding.
 - As a creator, I can submit a game for approval so it can be reviewed before sale.
 - As a creator, I can see approval feedback so I can revise my submission.
 - As a creator, I can track sales and payouts so I understand revenue.
@@ -152,4 +159,7 @@ Recommended first implementation order:
 8. Host spoiler-safe round controls.
 9. Accusation and final reveal.
 10. Payment/email integration.
-
+11. Conditional unlock/code-entry player UI.
+12. Deeper publish-readiness checks for non-code conditional rule types.
+13. Final reveal editor.
+14. Creator marketplace only after the internal builder and conditional engine are stable.

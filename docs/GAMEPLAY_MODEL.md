@@ -1,6 +1,6 @@
 # Gameplay Model
 
-Last inspected: 2026-05-17
+Last inspected: 2026-05-22
 
 ## Purpose
 
@@ -114,6 +114,12 @@ Guest may be:
 - Allowed to submit accusations.
 
 Guest does not necessarily need a full user account in the MVP, but should have a secure guest session or invite token.
+
+Guest invitation state should be tracked separately from gameplay participation:
+
+- `INVITED`, `JOINED`, and `PENDING_APPROVAL` describe party participation.
+- `NOT_SENT`, `QUEUED`, `SENT`, and `FAILED` describe invitation delivery.
+- Hosts should see last queued/sent timestamps, resend count, and failed delivery details without exposing game spoilers.
 
 ### Character
 
@@ -298,6 +304,151 @@ Messages may be:
 - Delivered by host reveal
 - Logged in party state after delivery
 
+### DigitalArtifact
+
+A structured gameplay object authored by an admin or future creator.
+
+Examples:
+
+- Fake emails
+- Fake text messages
+- Documents
+- Investigation sheets
+- Locked folders
+- Digital keys
+- Decoder payloads
+- Inventory-style clues
+
+Digital artifacts should have explicit visibility, optional character/round/evidence/media links, and optional conditional unlock rules. They are the builder-friendly layer above raw cards, evidence, and media assets.
+
+### CharacterTool
+
+A character-specific interactive tool available in a player's app.
+
+Examples:
+
+- Digital key
+- Decoder
+- Scanner
+- Access-code generator
+- Notebook
+- Restricted-folder opener
+
+Tools are authored on a `GameVersion` and assigned to a `Character`. Runtime copies are represented by party-specific tool instances so codes and state can differ per party.
+
+### AccessCodeGenerator
+
+A specialized `CharacterTool` that creates or carries a party-specific code.
+
+Rules:
+
+- Raw codes should not be stored.
+- Codes should be scoped to a party.
+- Codes may be one-time use, limited-use, round-specific, or expiring.
+- Code attempts should be recorded without exposing the raw code.
+
+### LockedEvidence
+
+Evidence, cards, media, or digital artifacts that require an unlock rule before becoming visible.
+
+Locked evidence may require:
+
+- Current or completed round.
+- Host reveal.
+- Specific character assignment.
+- Player interaction.
+- Code entry.
+- Host approval.
+- Prior clue or asset view.
+
+### UnlockRule
+
+A rule describing how locked content becomes available.
+
+Rule inputs may include:
+
+- Required round.
+- Required character.
+- Source character tool.
+- Required asset view.
+- Required player interaction.
+- Host approval.
+- Victim reveal or final reveal state.
+- Access-code validation.
+
+Rule effects should declare the target content and unlock scope: one player, all players, host, host and players, or the whole party.
+
+### PlayerInteraction
+
+A runtime record that two or more players interacted through an authored mechanic.
+
+Examples:
+
+- One player generates a code and another enters it.
+- A player scans another player's clue.
+- A player shares a digital key.
+- Multiple players confirm a joint action.
+
+Interactions should be party-scoped and auditable.
+
+### PlayerInventory
+
+The runtime set of digital items available to a guest.
+
+Inventory can contain:
+
+- Character tools.
+- Digital artifacts.
+- Keys or access tokens.
+- Unlocked documents.
+- Temporary clue objects.
+
+Inventory items should be party-specific and tied to the guest, not only to the authored game definition.
+
+### ToolInstance
+
+A party-specific instance of a `CharacterTool`.
+
+Used for:
+
+- Per-party access codes.
+- Tool status such as active, used, expired, or revoked.
+- Remaining uses.
+- Expiration time.
+- Runtime metadata.
+
+### UnlockEvent
+
+A successful runtime unlock.
+
+Used by player-safe content filters to decide whether locked content is available. Unlock events should store the actor, target player when relevant, target content, scope, and metadata, but not raw secrets.
+
+### AssetView
+
+A runtime record that a guest viewed a card, evidence item, media asset, or digital artifact.
+
+Useful for rules such as:
+
+- Unlock content after another clue has been viewed.
+- Track investigation progress.
+- Provide admin/host progress summaries without revealing private content.
+
+### CodeAttempt
+
+A runtime record of an access-code attempt.
+
+Stores:
+
+- Party.
+- Actor guest.
+- Tool instance when relevant.
+- Unlock rule.
+- Status.
+- Salted/hash-derived attempted value or equivalent safe fingerprint.
+- Metadata such as failure reason.
+
+Raw submitted codes should not be stored.
+
 ### Accusation
 
 A player's submitted guess or formal accusation.
@@ -419,6 +570,7 @@ Examples:
 
 - Setup checklist
 - Guest invite status
+- Guest invitation delivery status and failure details
 - Required character count
 - Character assignment labels that avoid killer/victim spoilers
 - Round start buttons
@@ -547,3 +699,39 @@ Every gameplay read should answer these questions server-side:
 9. What unlock rules apply?
 10. Should this content be redacted, hidden, or returned?
 
+## Conditional Reveal Flow
+
+The current foundation adds a rule-aware layer to the existing round/reveal model.
+
+Recommended flow:
+
+1. Authored content is created as a card, evidence item, media asset, or digital artifact.
+2. If it is conditional, the content stores a `requiredUnlockRuleId`.
+3. A character tool or other trigger creates a party-scoped unlock path.
+4. A runtime event, such as a valid code entry, records a successful `UnlockEvent`.
+5. Player-safe services collect unlock events for the current guest.
+6. Cards, evidence, media, and future digital artifacts remain hidden until the guest has the required unlock rule, the round/reveal state allows it, and the assignment/visibility rules match.
+
+Current runtime foundation:
+
+- `/play` displays character-specific access-code generator tools only to the assigned tool holder.
+- Locked evidence, cards, media, and digital artifacts that are otherwise visible to a player appear as code-entry prompts until their required unlock rule succeeds.
+- `POST /play/unlock` validates the guest, assignment, rule, target availability, CSRF token, rate limit, and hashed party tool code before recording an unlock event.
+- Raw access codes are not stored; generated tool instances and attempts store hashes.
+
+Host and admin behavior:
+
+- Admins can inspect full authored content in admin surfaces.
+- Hosts can see public and host-safe operational content by default.
+- Hosts can only see spoiler-protected content after explicit spoiler-mode unlock.
+- Host spoiler unlock remains separate from player conditional unlocks.
+
+Cross-player example:
+
+1. Character A has an access-code generator.
+2. Character B has locked evidence.
+3. Character A shares the generated party-specific code.
+4. Character B enters the code.
+5. The app records a `CodeAttempt`.
+6. If valid, the app records an `UnlockEvent` scoped to Character B's guest.
+7. Character B can now see the locked content; Character A and other players still cannot unless the rule scope allows it.

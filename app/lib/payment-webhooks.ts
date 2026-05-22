@@ -54,3 +54,12 @@ export async function markPaymentWebhookEventProcessed(id: string) {
     }
   });
 }
+
+export async function markPaymentWebhookEventFailed(id: string) {
+  return prisma.paymentWebhookEvent.update({
+    where: { id },
+    data: {
+      status: "FAILED"
+    }
+  });
+}

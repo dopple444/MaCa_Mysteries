@@ -12,6 +12,10 @@ function getFormValue(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function redirectToTicket(request: Request, ticketId: string) {
+  return NextResponse.redirect(new URL(`/admin/support/${ticketId}`, request.url), 303);
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ ticketId: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -56,5 +60,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
     }
   });
 
-  return NextResponse.redirect(new URL("/admin", request.url), 303);
+  return redirectToTicket(request, ticketId);
 }
