@@ -22,6 +22,8 @@ This checklist captures the current security posture and the next hardening move
 - Support-gated account recovery cases track identity review, matching support-ticket linkage, safe reset/verification email queueing, and recovery audit events without exposing signed links.
 - User sessions retain IP address, user-agent, created-by, last-seen, expiration, and revocation metadata for account review.
 - Login tracks consecutive failed attempts and temporarily locks accounts after repeated failures.
+- Repeated-login lockouts queue deduped account-security alert emails when admin alert recipients are configured.
+- Password reset, logout, super-admin session revocation, and role changes mark active sessions revoked instead of deleting them.
 - Guest invitation delivery state is server-side and does not expose gameplay spoilers.
 - Database-backed rate limiting is active for login, signup, guest join, support ticket intake, and checkout-start.
 - Email verification and password reset use signed account-action links delivered through queued email.
@@ -46,7 +48,8 @@ This checklist captures the current security posture and the next hardening move
    - Account-security audit history and sensitive role-change approval requests are visible to super admins.
    - Account recovery cases are visible to support-capable admins and require verified identity before queuing password reset email.
    - Consecutive login failure lockout and session metadata are implemented.
-   - Consider session rotation after login and sensitive account changes.
+   - Password reset and role changes invalidate active sessions for the affected account.
+   - Consider session rotation after additional sensitive account changes.
 
 3. Secret management.
    - Keep `.env` out of source control.
@@ -100,7 +103,7 @@ This checklist captures the current security posture and the next hardening move
 
 | Route | Current Risk | Next Hardening |
 | --- | --- | --- |
-| `/login` | Brute force attempts | Rate limit, login audit events, and consecutive-failure account lockout are active; add risk-scored alerts later |
+| `/login` | Brute force attempts | Rate limit, login audit events, consecutive-failure account lockout, and deduped lockout alert emails are active |
 | `/signup` | Spam accounts | Rate limit is active and signup queues email verification |
 | `/join` | Invite-code guessing | Rate limit is active; add suspicious attempt audit events |
 | `/play` | Guest token misuse | Token rotation/reissue flow later |
@@ -132,7 +135,7 @@ This checklist captures the current security posture and the next hardening move
 
 ## Recommended Next Code Changes
 
-1. Add session rotation after sensitive account changes and risk-scored alerts for repeated lockouts.
+1. Add recovery drill reporting and deeper risk scoring for repeated lockouts/recovery requests.
 2. Expand dedicated test database coverage with more browser-level mutation tests.
 3. Add structured logging for webhook, support, auth, and admin events.
 4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.

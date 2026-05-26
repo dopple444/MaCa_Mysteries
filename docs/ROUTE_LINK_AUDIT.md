@@ -136,5 +136,5 @@ Latest live verification:
 2. Add S3-compatible upload writes and signed private media URLs.
 3. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
 4. Add invite reminder scheduling after email operations settle.
-5. Add session rotation and risk-scored account-security alerts.
+5. Add recovery drill reporting and deeper risk-scored account-security alerts.
 6. Add creator routes later, after the first-party builder, conditional engine, and first-party MVP are stable.

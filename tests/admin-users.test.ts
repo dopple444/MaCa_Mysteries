@@ -95,6 +95,20 @@ test("approveAdminActionRequest applies pending role changes and audits the revi
 
     assert.equal(requested.status, "REQUESTED");
     assert.ok(requested.requestId);
+    await prisma.userSession.createMany({
+      data: [
+        {
+          userId: fixture.target.id,
+          tokenHash: `${fixture.label}-role-session-a`,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+        },
+        {
+          userId: fixture.target.id,
+          tokenHash: `${fixture.label}-role-session-b`,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+        }
+      ]
+    });
 
     const approved = await approveAdminActionRequest({
       actor: fixture.superAdmin,
@@ -102,9 +116,22 @@ test("approveAdminActionRequest applies pending role changes and audits the revi
     });
 
     assert.equal(approved.status, "APPROVED");
+    assert.equal(approved.revokedSessionCount, 2);
 
     const target = await prisma.user.findUnique({ where: { id: fixture.target.id } });
     assert.equal(target?.role, "CONTENT_EDITOR");
+    assert.equal(await prisma.userSession.count({ where: { userId: fixture.target.id, revokedAt: null } }), 0);
+    assert.equal(
+      await prisma.userSession.count({
+        where: {
+          userId: fixture.target.id,
+          revokedAt: { not: null },
+          revokedByUserId: fixture.superAdmin.id,
+          revokeReason: "ROLE_CHANGED"
+        }
+      }),
+      2
+    );
 
     const request = await prisma.adminActionRequest.findUniqueOrThrow({
       where: { id: requested.requestId }

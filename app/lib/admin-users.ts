@@ -258,11 +258,25 @@ export async function updateManagedUserRole(input: UpdateUserRoleInput) {
     return { status: "REQUESTED" as const, requestId: request.id, user: target };
   }
 
-  const updated = await prisma.user.update({
-    where: { id: target.id },
-    data: { role: nextRole },
-    select: { id: true, email: true, role: true }
-  });
+  const roleChangedAt = new Date();
+  const [updated, revokedSessions] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: target.id },
+      data: { role: nextRole },
+      select: { id: true, email: true, role: true }
+    }),
+    prisma.userSession.updateMany({
+      where: {
+        userId: target.id,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: roleChangedAt,
+        revokedByUserId: input.actor.id,
+        revokeReason: "ROLE_CHANGED"
+      }
+    })
+  ]);
 
   await logAuditEvent({
     userId: input.actor.id,
@@ -272,11 +286,12 @@ export async function updateManagedUserRole(input: UpdateUserRoleInput) {
     metadata: {
       targetEmail: updated.email,
       previousRole: target.role,
-      nextRole: updated.role
+      nextRole: updated.role,
+      revokedSessionCount: revokedSessions.count
     }
   });
 
-  return { status: "UPDATED" as const, user: updated, previousRole: target.role };
+  return { status: "UPDATED" as const, user: updated, previousRole: target.role, revokedSessionCount: revokedSessions.count };
 }
 
 export async function approveAdminActionRequest(input: ReviewAdminActionRequestInput) {
@@ -311,15 +326,28 @@ export async function approveAdminActionRequest(input: ReviewAdminActionRequestI
   }
 
   const reviewNote = normalizeReviewNote(input.reviewNote);
-  const previousRole = request.targetUser.role;
+  const targetUser = request.targetUser;
+  const previousRole = targetUser.role;
 
-  const [updated] = await prisma.$transaction([
-    prisma.user.update({
-      where: { id: request.targetUser.id },
+  const roleChangedAt = new Date();
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id: targetUser.id },
       data: { role: nextRole },
       select: { id: true, email: true, role: true }
-    }),
-    prisma.adminActionRequest.update({
+    });
+    const revokedSessions = await tx.userSession.updateMany({
+      where: {
+        userId: targetUser.id,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: roleChangedAt,
+        revokedByUserId: input.actor.id,
+        revokeReason: "ROLE_CHANGED"
+      }
+    });
+    await tx.adminActionRequest.update({
       where: { id: request.id },
       data: {
         status: "APPROVED",
@@ -327,8 +355,8 @@ export async function approveAdminActionRequest(input: ReviewAdminActionRequestI
         reviewedAt: new Date(),
         reviewNote
       }
-    }),
-    prisma.auditLog.create({
+    });
+    await tx.auditLog.create({
       data: {
         userId: input.actor.id,
         action: "admin.actionRequest.approved",
@@ -336,30 +364,40 @@ export async function approveAdminActionRequest(input: ReviewAdminActionRequestI
         entityId: request.id,
         metadata: {
           actionType: request.actionType,
-          targetUserId: request.targetUser.id,
-          targetEmail: request.targetUser.email,
+          targetUserId: targetUser.id,
+          targetEmail: targetUser.email,
           previousRole,
-          nextRole
+          nextRole,
+          revokedSessionCount: revokedSessions.count
         }
       }
-    }),
-    prisma.auditLog.create({
+    });
+    await tx.auditLog.create({
       data: {
         userId: input.actor.id,
         action: "admin.user.roleChanged",
         entityType: "User",
-        entityId: request.targetUser.id,
+        entityId: targetUser.id,
         metadata: {
           requestId: request.id,
-          targetEmail: request.targetUser.email,
+          targetEmail: targetUser.email,
           previousRole,
-          nextRole
+          nextRole,
+          revokedSessionCount: revokedSessions.count
         }
       }
-    })
-  ]);
+    });
 
-  return { status: "APPROVED" as const, user: updated, previousRole, requestId: request.id };
+    return { updated, revokedSessionCount: revokedSessions.count };
+  });
+
+  return {
+    status: "APPROVED" as const,
+    user: result.updated,
+    previousRole,
+    requestId: request.id,
+    revokedSessionCount: result.revokedSessionCount
+  };
 }
 
 export async function denyAdminActionRequest(input: ReviewAdminActionRequestInput) {

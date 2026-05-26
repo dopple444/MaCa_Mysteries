@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   getNextFailedLoginCount,
   isAccountLocked,
+  queueAccountLockoutAlert,
   recordFailedLogin,
   recordSuccessfulLogin
 } from "../app/lib/account-lockout";
@@ -175,6 +176,52 @@ test("account lockout tracks consecutive failures and clears after success", asy
     assert.equal(user.failedLoginCount, 0);
     assert.equal(user.lockedUntil, null);
     assert.ok(user.lastLoginAt);
+  } finally {
+    await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
+  }
+});
+
+test("account lockout alerts queue deduped admin emails", async () => {
+  const fixture = await createAccountSecurityFixture("account-security-alert");
+  const lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+
+  try {
+    const result = await queueAccountLockoutAlert({
+      userId: fixture.user.id,
+      email: fixture.user.email,
+      failedLoginCount: 5,
+      lockedUntil,
+      env: {
+        ADMIN_ALERT_EMAILS: `security${fixture.emailDomain}`,
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+
+    assert.equal(result.status, "QUEUED");
+    assert.equal(result.queuedCount, 1);
+
+    const duplicate = await queueAccountLockoutAlert({
+      userId: fixture.user.id,
+      email: fixture.user.email,
+      failedLoginCount: 6,
+      lockedUntil,
+      env: {
+        ADMIN_ALERT_EMAILS: `security${fixture.emailDomain}`,
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+    assert.equal(duplicate.status, "DUPLICATE");
+
+    const messages = await prisma.outboundMessage.findMany({
+      where: {
+        userId: fixture.user.id,
+        recipient: `security${fixture.emailDomain}`,
+        templateKey: "account_lockout_alert"
+      }
+    });
+    assert.equal(messages.length, 1);
+    assert.match(messages[0]?.bodyPreview ?? "", /temporarily locked/);
+    assert.match(messages[0]?.bodyPreview ?? "", /\/admin\/users/);
   } finally {
     await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
   }

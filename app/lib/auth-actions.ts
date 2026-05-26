@@ -12,7 +12,7 @@ import {
   verifyPassword
 } from "./auth";
 import { logAuthAuditEvent } from "./auth-audit";
-import { isAccountLocked, recordFailedLogin, recordSuccessfulLogin } from "./account-lockout";
+import { isAccountLocked, queueAccountLockoutAlert, recordFailedLogin, recordSuccessfulLogin } from "./account-lockout";
 import { getPostLoginRedirectPath } from "./auth-flow";
 import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
@@ -73,6 +73,14 @@ export async function login(formData: FormData) {
         lockedUntil: failedState?.lockedUntil?.toISOString() ?? ""
       }
     });
+    if (user && failedState?.locked) {
+      await queueAccountLockoutAlert({
+        userId: user.id,
+        email: user.email,
+        failedLoginCount: failedState.failedLoginCount,
+        lockedUntil: failedState.lockedUntil
+      });
+    }
     redirect(failedState?.locked ? "/login?error=locked" : "/login?error=invalid");
   }
 
