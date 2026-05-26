@@ -114,11 +114,19 @@ Preferred prerequisite: the server should have PostgreSQL client tools installed
 Do not restore over a live database casually. For a drill, restore into a separate database first:
 
 ```bash
-createdb maca_mysteries_restore_test
-pg_restore --dbname=maca_mysteries_restore_test --no-owner --no-privileges /path/to/backup.dump
+npm run backup:restore-drill -- /path/to/backup.dump
 ```
 
-After restore, run read-only smoke checks before trusting the backup.
+If no backup file is passed, the script restores the latest `DATABASE_BACKUP_PREFIX_*.dump` file from `DATABASE_BACKUP_DIR`. It drops and recreates only the configured drill database, refuses to use the source database name, requires the drill database name to include `restore` or `drill`, runs `pg_restore`, and checks Prisma migration status against the restored database. If host PostgreSQL client tools are missing, it can fall back to a running Postgres Docker container.
+
+Optional environment:
+
+```bash
+DATABASE_RESTORE_DRILL_DATABASE=maca_mysteries_restore_drill
+DATABASE_RESTORE_SOURCE=/path/to/backup.dump
+```
+
+After restore, run read-only smoke checks before trusting the backup. Drop the drill database when you no longer need it.
 
 ## Immediate Incident Checklist
 

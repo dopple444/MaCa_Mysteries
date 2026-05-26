@@ -297,4 +297,4 @@ Gaps:
 - Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
 - Auth now has email verification, password reset, consecutive-failure account lockout, deduped account lockout alert emails, session metadata/revocation records, session invalidation after role changes/password reset/logout, super-admin role assignment, sensitive role-change approval requests, super-admin session revocation, support/admin recovery case tooling, recovery risk reporting/alerts, login/logout/account audit events, and visible account-security audit history foundations. It still lacks OAuth and more advanced behavioral risk scoring.
 - Admin role values and route gates now support full admin, content editor, finance, and support scopes.
-- A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.
+- A dedicated test database, database backup script, and guarded restore-drill script now exist; scheduled off-box backups are still needed before production launch.

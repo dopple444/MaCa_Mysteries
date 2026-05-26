@@ -39,6 +39,8 @@ Outbound messages are queued in PostgreSQL. Email delivery supports local consol
 | `ADMIN_ALERT_EMAILS` | Recommended before live testing | Comma-separated operations recipients for queued payment-risk, account-security, conditional-unlock, and account-recovery risk alert emails. |
 | `SMS_PROVIDER` | Later | Provider name for SMS delivery, such as Twilio. |
 | `SMS_API_KEY` | Later | SMS provider credential. |
+| `DATABASE_RESTORE_SOURCE` | Optional restore drill | Backup file path used by `npm run backup:restore-drill` when no CLI path is passed. |
+| `DATABASE_RESTORE_DRILL_DATABASE` | Optional restore drill | Separate restore-drill database name. Must not equal the source database and must include `restore` or `drill`. |
 
 ## Object Storage
 

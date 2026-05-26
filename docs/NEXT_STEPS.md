@@ -202,11 +202,12 @@ Last inspected: 2026-05-22
 19. Automate backups and restore drills.
    - Status: implemented foundation.
    - `npm run backup:db` creates timestamped custom-format PostgreSQL dumps under `DATABASE_BACKUP_DIR`.
-   - The backup script uses host `pg_dump` when available and can fall back to a running Postgres Docker container.
-   - Server prerequisite still preferred: install PostgreSQL client tools so `pg_dump` and `pg_restore` are available directly.
+   - `npm run backup:restore-drill -- /path/to/backup.dump` restores a backup into a separate guarded drill database and verifies Prisma migration status.
+   - The backup and restore-drill scripts use host PostgreSQL client tools when available and can fall back to a running Postgres Docker container.
+   - Server prerequisite still preferred: install PostgreSQL client tools so `pg_dump`, `pg_restore`, and `psql` are available directly.
    - Schedule PostgreSQL backups.
    - Store backups off-box.
-   - Practice restore into a separate database before production launch.
+   - Practice restore into a separate database before production launch and record the drill result.
 
 20. Keep marketplace work behind the first-party MVP.
    - Preserve creator profile, publishing approval, revenue split, payout, and review plans.

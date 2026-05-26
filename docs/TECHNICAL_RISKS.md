@@ -199,13 +199,14 @@ Current risk:
 
 - Docker production scaffolding exists, but the current server still runs directly on Ubuntu.
 - Production secret management, off-box backup scheduling, reverse proxy/TLS, monitoring, and process supervision are not complete.
-- The working tree contains a large uncommitted platform slice.
+- Backup creation and guarded restore-drill scripts exist, but restore drills still need to be run and recorded before launch.
+- The platform foundation has been split into committed checkpoints, but deployment discipline still depends on keeping future changes small and verified.
 
 Mitigation:
 
-- Commit the current slice when ready.
+- Keep future work in small, verified commits.
 - Keep the direct dev server on `192.168.2.45:3001` until Docker cutover is intentionally tested.
-- Use `npm run backup:db` before risky migrations, then add scheduled off-box backups, restore drills, TLS/reverse proxy, firewall rules, and health checks.
+- Use `npm run backup:db` before risky migrations, use `npm run backup:restore-drill -- /path/to/backup.dump` to practice restores into a separate database, then add scheduled off-box backups, TLS/reverse proxy, firewall rules, and health checks.
 - Run `npx prisma migrate deploy`, `npm test`, `npm run build`, and live tests before production changes.
 
 ## Authorization Gaps

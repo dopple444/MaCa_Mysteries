@@ -12,6 +12,7 @@
     "test:prepare": "tsx scripts/prepare-test-database.ts",
     "prisma:seed": "tsx prisma/seed.ts",
     "backup:db": "tsx scripts/backup-database.ts",
+    "backup:restore-drill": "tsx scripts/restore-database-drill.ts",
     "payment:check": "tsx scripts/check-payment-config.ts",
     "stripe:login": "./tools/stripe/stripe login",
     "stripe:listen": "./tools/stripe/stripe listen --forward-to http://127.0.0.1:3001/api/webhooks/payments/stripe --events checkout.session.completed"
