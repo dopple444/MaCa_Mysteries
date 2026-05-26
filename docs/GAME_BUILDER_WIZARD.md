@@ -54,6 +54,8 @@ The wizard should eventually walk an admin through:
 
 Future AI tools should integrate through a reviewable package format rather than direct database writes.
 
+The first validator lives in `app/lib/game-package.ts`; the detailed contract is documented in `docs/GAME_PACKAGE_IMPORT.md`.
+
 The package should include:
 
 - Synopsis, theme, setting, player count, duration, and content warnings.
@@ -117,5 +119,6 @@ The engine should support:
 2. Expand publish-readiness checks to cover spoiler wording, circular dependencies, asset-view rules, host-approval rules, reveal-state rules, and multi-player interaction rules.
 3. Add runtime support for asset-view, host-approval, reveal-state, and multi-player interaction rules.
 4. Add object storage and signed private media URLs before production private media.
-5. Define the Game Package import schema and importer for AI-assisted drafts.
-6. Add certified creator dashboard permissions only after the first-party builder is stable.
+5. Add admin-only Game Package dry-run upload/review UI.
+6. Add a draft-only Game Package importer for AI-assisted drafts.
+7. Add certified creator dashboard permissions only after the first-party builder is stable.

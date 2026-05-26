@@ -16,6 +16,7 @@ Last inspected: 2026-05-22
 - Host run-of-show summary and player status summary.
 - Join/play pages have a first mobile/accessibility pass for tighter phone spacing, explicit form labels, full-width mobile actions, and safer media sizing.
 - Game Builder Wizard and Conditional Reveal Engine foundations now exist for digital artifacts, character tools, unlock rules, player inventory, tool instances, code attempts, asset views, player interactions, and unlock events.
+- Game Package import contract and validator now exist for future AI-assisted draft creation.
 - Admin game detail pages now include draft-only editors for digital artifacts, character tools, and unlock rules.
 - Admin builder preview pages can simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
 - Publish-readiness validation blocks unsafe game-version publishing when required content or conditional unlock wiring is incomplete.
@@ -227,7 +228,8 @@ Last inspected: 2026-05-22
    - Builder editor services validate draft locks, duplicate keys, version-owned linkages, player-private character requirements, valid rule targets, and access-code source tools.
    - Builder preview pages simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
    - Publishing now checks required content, final reveal presence, version-owned linkages, orphan required unlocks, unpublished required rules, unattached published rules, and access-code generator requirements.
-   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, deeper readiness checks for circular dependencies and spoiler wording, and a Game Package import schema for AI-assisted drafts.
+   - Game Package schema validation now exists for AI-assisted drafts; it validates structure, duplicate keys, references, visibility rules, source metadata, and final reveal references without writing to the database.
+   - Next implementation step: add an admin-only Game Package dry-run upload/review UI, then a draft-only importer, while continuing conditional reveal work for asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, and deeper readiness checks for circular dependencies and spoiler wording.
 
 22. Add a certified creator dashboard after the internal builder is stable.
    - Future `/creator` routes should be hidden unless the signed-in user has a certified/approved creator profile.
