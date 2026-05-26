@@ -91,6 +91,8 @@ function getAuditLabel(action: string) {
       return "Signed out";
     case "conditional.unlocks.alertQueued":
       return "Conditional unlock alert queued";
+    case "admin.gamePackage.validated":
+      return "Game Package validated";
     default:
       return action.replaceAll(".", " ");
   }
@@ -360,6 +362,12 @@ export default async function AdminPage({
               className="inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-400"
             >
               Create game
+            </Link>
+            <Link
+              href="/admin/games/package"
+              className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
+            >
+              Validate package
             </Link>
             <Link
               href="/admin/media/uploads"

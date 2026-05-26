@@ -6,6 +6,8 @@ import test from "node:test";
 
 import { PrismaClient } from "@prisma/client";
 
+import { GAME_PACKAGE_SCHEMA_VERSION } from "../app/lib/game-package";
+
 const baseUrl = process.env.TEST_BASE_URL;
 const prisma = new PrismaClient();
 
@@ -20,6 +22,55 @@ function sessionCookie(token: string) {
 function locationPath(location: string | null) {
   if (!location) return null;
   return location.startsWith("http") ? new URL(location).pathname : location;
+}
+
+function createValidGamePackageJson(label: string) {
+  return JSON.stringify({
+    schemaVersion: GAME_PACKAGE_SCHEMA_VERSION,
+    source: {
+      kind: "AI_ASSISTED",
+      toolName: "Access test"
+    },
+    game: {
+      slug: `access-package-${label}`,
+      title: "Access Package Test",
+      tagline: "Disposable package validation fixture.",
+      description: "Used only by live admin access-control tests.",
+      minPlayers: 4,
+      maxPlayers: 8,
+      durationMin: 120,
+      durationMax: 180
+    },
+    characters: [
+      {
+        key: "detective-vale",
+        name: "Detective Vale",
+        publicBio: "A careful investigator.",
+        isRequired: true
+      }
+    ],
+    rounds: [
+      {
+        key: "round-1",
+        title: "Round 1",
+        cards: [
+          {
+            key: "opening-card",
+            title: "Opening Card",
+            body: "Opening private card.",
+            visibility: "PLAYER_PRIVATE",
+            characterKey: "detective-vale"
+          }
+        ]
+      }
+    ],
+    finalReveal: {
+      title: "Final Reveal",
+      victimCharacterKey: "detective-vale",
+      killerCharacterKey: "detective-vale",
+      solutionText: "The solution is test-only."
+    }
+  });
 }
 
 async function createSession(userId: string, label: string) {
@@ -573,9 +624,77 @@ test(
       assert.equal(contentResponse.status, 200);
       const contentHtml = await contentResponse.text();
       assert.match(contentHtml, /Create game/);
+      assert.match(contentHtml, /Validate package/);
       assert.doesNotMatch(contentHtml, /Payment operations/);
       assert.doesNotMatch(contentHtml, /Conditional unlock monitoring/);
       assert.doesNotMatch(contentHtml, /Support queue/);
+
+      const contentPackageResponse = await fetch(`${appUrl}/admin/games/package`, {
+        headers: { cookie: sessionCookie(contentToken) },
+        redirect: "manual"
+      });
+      assert.equal(contentPackageResponse.status, 200);
+      const contentPackageHtml = await contentPackageResponse.text();
+      assert.match(contentPackageHtml, /Validate Game Package/);
+
+      const hostPackageResponse = await fetch(`${appUrl}/admin/games/package`, {
+        headers: { cookie: sessionCookie(hostToken) },
+        redirect: "manual"
+      });
+      assert.equal(hostPackageResponse.status, 404);
+
+      const unauthenticatedPackageValidationResponse = await fetch(`${appUrl}/admin/games/package/validate`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          packageJson: createValidGamePackageJson(label)
+        }),
+        redirect: "manual"
+      });
+      assert.equal(unauthenticatedPackageValidationResponse.status, 401);
+
+      const hostPackageValidationResponse = await fetch(`${appUrl}/admin/games/package/validate`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(hostToken)
+        },
+        body: new URLSearchParams({
+          packageJson: createValidGamePackageJson(label)
+        }),
+        redirect: "manual"
+      });
+      assert.equal(hostPackageValidationResponse.status, 403);
+
+      const contentPackageValidationResponse = await fetch(`${appUrl}/admin/games/package/validate`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(contentToken)
+        },
+        body: new URLSearchParams({
+          packageJson: createValidGamePackageJson(label)
+        }),
+        redirect: "manual"
+      });
+      assert.equal(contentPackageValidationResponse.status, 200);
+      const contentPackageValidation = await contentPackageValidationResponse.json();
+      assert.equal(contentPackageValidation.ok, true);
+      assert.equal(contentPackageValidation.result.ok, true);
+      assert.equal(contentPackageValidation.result.summary.characters, 1);
+
+      const contentInvalidPackageResponse = await fetch(`${appUrl}/admin/games/package/validate`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(contentToken)
+        },
+        body: new URLSearchParams({
+          packageJson: "{not-json"
+        }),
+        redirect: "manual"
+      });
+      assert.equal(contentInvalidPackageResponse.status, 400);
 
       const financeResponse = await fetch(`${appUrl}/admin`, {
         headers: { cookie: sessionCookie(financeToken) },
@@ -585,6 +704,7 @@ test(
       const financeHtml = await financeResponse.text();
       assert.match(financeHtml, /Payment operations/);
       assert.doesNotMatch(financeHtml, /Create game/);
+      assert.doesNotMatch(financeHtml, /Validate package/);
       assert.doesNotMatch(financeHtml, /Conditional unlock monitoring/);
       assert.doesNotMatch(financeHtml, /Support queue/);
 

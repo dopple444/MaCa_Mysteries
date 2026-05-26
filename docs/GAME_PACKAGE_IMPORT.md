@@ -12,8 +12,11 @@ No external tool should write directly to live game tables or publish content.
 
 - `app/lib/game-package.ts` defines the first `maca-game-package/v1` contract and validator.
 - `validateGamePackage()` checks structure, duplicate keys, supported enum values, broken references, player-private character requirements, final reveal references, and AI-review warnings.
+- `/admin/games/package` provides a content-admin dry-run screen for pasted JSON or uploaded `.json` package files.
+- `POST /admin/games/package/validate` validates the submitted package, returns a JSON report, enforces content-admin access and CSRF, and audits the dry-run without storing package content.
 - `tests/game-package.test.ts` covers accepted AI-assisted packages, duplicate keys, broken references, unsupported schema versions, and unsafe player/duration ranges.
-- This is a contract and validation layer only. It does not import into PostgreSQL yet.
+- Live access-control tests cover the admin-only dry-run route and validation endpoint.
+- This is still a contract and validation layer only. It does not import into PostgreSQL yet.
 
 ## Package Shape
 
@@ -44,8 +47,8 @@ Top-level fields:
 
 ## Import Roadmap
 
-1. Keep the validator independent from database writes.
-2. Add an admin-only dry-run upload/review route that displays validation results.
+1. Keep the validator independent from database writes. Status: implemented.
+2. Add an admin-only dry-run upload/review route that displays validation results. Status: implemented.
 3. Add a draft-only importer that creates a new draft `GameVersion`.
 4. Preserve source metadata for imported/AI-assisted content.
 5. Run publish-readiness after import.

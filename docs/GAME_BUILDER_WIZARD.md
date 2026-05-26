@@ -32,6 +32,7 @@ Implemented foundation:
 - `POST /play/unlock` validates CSRF, rate limits attempts, records hashed code attempts, and creates unlock events without storing raw codes.
 - Host party pages show sanitized code-attempt and unlock-event activity; spoiler-sensitive rule/tool labels stay generic unless host spoiler mode is unlocked.
 - Tests cover role visibility separation, a cross-player access-code unlock flow, player tool panel/code-entry behavior, admin builder editor validation, builder preview projections, and publish-readiness validation.
+- Game Package validation now has an admin-only dry-run page at `/admin/games/package` and a CSRF-protected validation route at `POST /admin/games/package/validate`.
 
 ## Builder Wizard Scope
 
@@ -54,7 +55,7 @@ The wizard should eventually walk an admin through:
 
 Future AI tools should integrate through a reviewable package format rather than direct database writes.
 
-The first validator lives in `app/lib/game-package.ts`; the detailed contract is documented in `docs/GAME_PACKAGE_IMPORT.md`.
+The first validator lives in `app/lib/game-package.ts`; content admins can dry-run package files through `/admin/games/package`; the detailed contract is documented in `docs/GAME_PACKAGE_IMPORT.md`.
 
 The package should include:
 
@@ -119,6 +120,6 @@ The engine should support:
 2. Expand publish-readiness checks to cover spoiler wording, circular dependencies, asset-view rules, host-approval rules, reveal-state rules, and multi-player interaction rules.
 3. Add runtime support for asset-view, host-approval, reveal-state, and multi-player interaction rules.
 4. Add object storage and signed private media URLs before production private media.
-5. Add admin-only Game Package dry-run upload/review UI.
+5. Add admin-only Game Package dry-run upload/review UI. Status: implemented.
 6. Add a draft-only Game Package importer for AI-assisted drafts.
 7. Add certified creator dashboard permissions only after the first-party builder is stable.

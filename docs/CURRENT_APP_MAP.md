@@ -221,6 +221,7 @@ The app now has a foundation for advanced builder-authored unlock mechanics:
 9. Admin game detail pages include draft-only editors for digital artifacts, character tools, and unlock rules.
 10. Builder editor routes validate CSRF/admin access, save through `app/lib/admin-builder.ts`, and audit create/update events.
 11. Admin builder preview pages use `app/lib/builder-preview.ts` to project visible cards, evidence, media, digital artifacts, and tools as host-safe host, spoiler host, or a selected character.
+12. `app/lib/game-package.ts`, `/admin/games/package`, and `POST /admin/games/package/validate` provide the first Game Package dry-run validation path for future AI-assisted draft imports without database writes.
 
 ## Current Database Model
 
