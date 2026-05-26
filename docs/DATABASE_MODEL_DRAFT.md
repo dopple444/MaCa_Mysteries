@@ -206,6 +206,12 @@ Suggested fields:
 - `version_label`
 - `version_number`
 - `status`
+- `themes`
+- `content_warnings`
+- `source_kind`
+- `source_tool_name`
+- `source_tool_version`
+- `source_notes`
 - `published_at`
 - `retired_at`
 - `design_mode`

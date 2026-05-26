@@ -1,0 +1,110 @@
+import { NextResponse } from "next/server";
+
+import { hasAdminPermission } from "../../../../lib/admin-permissions";
+import { createAppUrl } from "../../../../lib/app-url";
+import { logAuditEvent } from "../../../../lib/audit-log";
+import { getCurrentUser } from "../../../../lib/auth";
+import { verifyCsrfToken } from "../../../../lib/csrf";
+import { importGamePackageAsDraft } from "../../../../lib/game-package-import";
+
+const MAX_PACKAGE_BYTES = 512 * 1024;
+
+function errorResponse(error: string, status = 400, extra: Record<string, unknown> = {}) {
+  return NextResponse.json({ ok: false, error, ...extra }, { status });
+}
+
+function getFormTextValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function getPackageJsonText(formData: FormData) {
+  const pastedJson = getFormTextValue(formData, "packageJson");
+  if (pastedJson) return { ok: true as const, text: pastedJson };
+
+  const file = formData.get("packageFile");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false as const, error: "Choose a package file or paste package JSON." };
+  }
+  if (file.size > MAX_PACKAGE_BYTES) {
+    return { ok: false as const, error: "Game Package files must be 512 KB or smaller." };
+  }
+
+  return { ok: true as const, text: await file.text() };
+}
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return errorResponse("Authentication is required.", 401);
+  }
+  if (!hasAdminPermission(user, "content")) {
+    return errorResponse("Content admin access is required.", 403);
+  }
+
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return errorResponse("Submit a multipart or form-encoded Game Package request.");
+  }
+
+  if (!(await verifyCsrfToken(formData))) {
+    return errorResponse("Your request could not be verified.", 400);
+  }
+
+  const packageText = await getPackageJsonText(formData);
+  if (!packageText.ok) {
+    return errorResponse(packageText.error);
+  }
+  if (Buffer.byteLength(packageText.text, "utf8") > MAX_PACKAGE_BYTES) {
+    return errorResponse("Game Package JSON must be 512 KB or smaller.");
+  }
+
+  let parsedPackage: unknown;
+  try {
+    parsedPackage = JSON.parse(packageText.text);
+  } catch {
+    return errorResponse("Game Package JSON could not be parsed.");
+  }
+
+  const result = await importGamePackageAsDraft(parsedPackage);
+  if (!result.ok) {
+    await logAuditEvent({
+      action: "admin.gamePackage.importRejected",
+      userId: user.id,
+      entityType: "GamePackage",
+      entityId: "draft-import",
+      metadata: {
+        reason: result.reason,
+        errorCount: result.errors.length,
+        warningCount: result.warnings.length,
+        summary: result.summary ?? null
+      }
+    });
+    return errorResponse(
+      result.reason === "slug-exists" ? "A game with that slug already exists." : "Game Package validation failed.",
+      result.reason === "slug-exists" ? 409 : 422,
+      { result }
+    );
+  }
+
+  await logAuditEvent({
+    action: "admin.gamePackage.imported",
+    userId: user.id,
+    entityType: "Game",
+    entityId: result.gameId,
+    metadata: {
+      versionId: result.versionId,
+      slug: result.slug,
+      summary: result.summary
+    }
+  });
+
+  return NextResponse.json({
+    ok: true,
+    gameId: result.gameId,
+    versionId: result.versionId,
+    redirectTo: createAppUrl(`/admin/games/${result.gameId}?imported=1`, request.url).toString()
+  });
+}

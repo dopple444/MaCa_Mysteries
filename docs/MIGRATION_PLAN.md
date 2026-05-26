@@ -354,6 +354,7 @@ Current foundation implemented:
 - Player-safe card/evidence/media services honor conditional unlock state.
 - Admin game detail pages inspect builder-foundation counts and unlock-rule summaries.
 - Admin game detail pages show publish-readiness errors/warnings, and the publish route blocks versions with readiness errors.
+- Admin Game Package dry-run validation and draft-only import exist for first-party and future AI-assisted draft creation.
 - Tests cover role visibility separation, cross-player access-code unlock behavior, builder preview behavior, and publish-readiness blocking.
 
 ## Phase 10: Prepare Payment/Email/SMS Integrations

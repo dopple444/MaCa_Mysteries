@@ -93,6 +93,10 @@ function getAuditLabel(action: string) {
       return "Conditional unlock alert queued";
     case "admin.gamePackage.validated":
       return "Game Package validated";
+    case "admin.gamePackage.imported":
+      return "Game Package imported";
+    case "admin.gamePackage.importRejected":
+      return "Game Package import rejected";
     default:
       return action.replaceAll(".", " ");
   }

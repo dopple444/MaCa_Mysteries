@@ -155,12 +155,14 @@ Mitigation:
 Current risk:
 
 - Admin editing exists for draft game metadata, characters, rounds, cards, evidence, and media metadata.
+- Game Package dry-run validation and draft-only import now exist, which improves AI-assisted authoring but introduces review risk if imported drafts are treated as publish-ready.
 - The builder must eventually cover synopsis, themes, player counts, bios, private backgrounds, relationships, pre-game tasks, round cards, clues, evidence, media, fake messages, final reveal content, spoiler rules, tools, conditional unlocks, previews, and publish/version control.
 - Building a large wizard too early could slow the MVP and create brittle UI around still-evolving rules.
 
 Mitigation:
 
 - Keep the next builder work admin-only and first-party focused.
+- Keep imported packages draft-only, preserve source metadata, and require human spoiler/IP/gameplay review before publishing.
 - Keep the current small editors and preview pages admin-only until publish validation covers every trigger type.
 - Build deeper publish-readiness checks before large visual wizard screens.
 - Treat creator access as a permission layer over a proven internal builder, not as the first implementation.

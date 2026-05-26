@@ -32,7 +32,7 @@ function createValidGamePackageJson(label: string) {
       toolName: "Access test"
     },
     game: {
-      slug: `access-package-${label}`,
+      slug: `test-admin-access-package-${label}`,
       title: "Access Package Test",
       tagline: "Disposable package validation fixture.",
       description: "Used only by live admin access-control tests.",
@@ -695,6 +695,42 @@ test(
         redirect: "manual"
       });
       assert.equal(contentInvalidPackageResponse.status, 400);
+
+      const hostPackageImportResponse = await fetch(`${appUrl}/admin/games/package/import`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(hostToken)
+        },
+        body: new URLSearchParams({
+          packageJson: createValidGamePackageJson(label)
+        }),
+        redirect: "manual"
+      });
+      assert.equal(hostPackageImportResponse.status, 403);
+
+      const contentPackageImportResponse = await fetch(`${appUrl}/admin/games/package/import`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(contentToken)
+        },
+        body: new URLSearchParams({
+          packageJson: createValidGamePackageJson(label)
+        }),
+        redirect: "manual"
+      });
+      assert.equal(contentPackageImportResponse.status, 200);
+      const contentPackageImport = await contentPackageImportResponse.json();
+      assert.equal(contentPackageImport.ok, true);
+      assert.match(contentPackageImport.redirectTo, /\/admin\/games\/.+\?imported=1/);
+      const importedGame = await prisma.game.findUnique({
+        where: { slug: `test-admin-access-package-${label}` },
+        include: { versions: true }
+      });
+      assert.ok(importedGame);
+      assert.ok(importedGame.versions[0]);
+      assert.equal(importedGame.versions[0].sourceKind, "AI_ASSISTED");
 
       const financeResponse = await fetch(`${appUrl}/admin`, {
         headers: { cookie: sessionCookie(financeToken) },

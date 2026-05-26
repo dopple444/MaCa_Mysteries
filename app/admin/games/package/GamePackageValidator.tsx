@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, FileJson, Upload } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 
 import type { GamePackageValidationIssue, GamePackageValidationResult } from "../../../lib/game-package";
 
@@ -9,6 +9,7 @@ type ValidationResponse = {
   ok: boolean;
   result?: GamePackageValidationResult;
   error?: string;
+  redirectTo?: string;
 };
 
 type GamePackageValidatorProps = {
@@ -88,8 +89,10 @@ function issueList(title: string, issues: GamePackageValidationIssue[], tone: "e
 }
 
 export function GamePackageValidator({ csrfToken, schemaVersion }: GamePackageValidatorProps) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [packageJson, setPackageJson] = useState("");
   const [isValidating, setIsValidating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [response, setResponse] = useState<ValidationResponse | null>(null);
 
   const summaryEntries = useMemo(() => {
@@ -134,8 +137,35 @@ export function GamePackageValidator({ csrfToken, schemaVersion }: GamePackageVa
     }
   }
 
+  async function handleImport() {
+    if (!formRef.current) return;
+    setIsImporting(true);
+    setResponse(null);
+
+    const formData = new FormData(formRef.current);
+    try {
+      const importResponse = await fetch("/admin/games/package/import", {
+        method: "POST",
+        body: formData,
+        headers: {
+          accept: "application/json"
+        }
+      });
+      const payload = (await importResponse.json()) as ValidationResponse;
+      if (importResponse.ok && payload.redirectTo) {
+        window.location.assign(payload.redirectTo);
+        return;
+      }
+      setResponse(importResponse.ok ? payload : { ok: false, error: payload.error || "Import failed." });
+    } catch {
+      setResponse({ ok: false, error: "Import request failed." });
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="mt-8 grid gap-6">
+    <form ref={formRef} onSubmit={handleSubmit} className="mt-8 grid gap-6">
       <input type="hidden" name="csrfToken" value={csrfToken} />
 
       <div className="rounded-2xl border border-white/10 bg-slate-950/80 p-4">
@@ -146,7 +176,10 @@ export function GamePackageValidator({ csrfToken, schemaVersion }: GamePackageVa
           </div>
           <button
             type="button"
-            onClick={() => setPackageJson(JSON.stringify(samplePackage, null, 2))}
+            onClick={() => {
+              setPackageJson(JSON.stringify(samplePackage, null, 2));
+              setResponse(null);
+            }}
             className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white"
           >
             <FileJson className="h-4 w-4" aria-hidden="true" />
@@ -161,6 +194,7 @@ export function GamePackageValidator({ csrfToken, schemaVersion }: GamePackageVa
           name="packageFile"
           type="file"
           accept="application/json,.json"
+          onChange={() => setResponse(null)}
           className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/90 px-4 py-3 text-white outline-none file:mr-4 file:rounded-full file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-400 focus:border-indigo-400"
         />
       </label>
@@ -170,20 +204,36 @@ export function GamePackageValidator({ csrfToken, schemaVersion }: GamePackageVa
         <textarea
           name="packageJson"
           value={packageJson}
-          onChange={(event) => setPackageJson(event.target.value)}
+          onChange={(event) => {
+            setPackageJson(event.target.value);
+            setResponse(null);
+          }}
           rows={18}
           spellCheck={false}
           className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/90 px-4 py-3 font-mono text-sm text-white outline-none focus:border-indigo-400"
         />
       </label>
 
-      <button
-        disabled={isValidating}
-        className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-slate-700"
-      >
-        <Upload className="h-4 w-4" aria-hidden="true" />
-        {isValidating ? "Validating" : "Validate package"}
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          disabled={isValidating || isImporting}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-slate-700"
+        >
+          <Upload className="h-4 w-4" aria-hidden="true" />
+          {isValidating ? "Validating" : "Validate package"}
+        </button>
+        {response?.result?.ok && (
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={isImporting || isValidating}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/50 px-6 py-3 text-sm font-semibold text-emerald-100 hover:border-emerald-200 disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500"
+          >
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+            {isImporting ? "Importing" : "Import draft"}
+          </button>
+        )}
+      </div>
 
       {response?.error && (
         <div className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-100">

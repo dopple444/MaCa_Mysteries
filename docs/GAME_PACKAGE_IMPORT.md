@@ -14,9 +14,13 @@ No external tool should write directly to live game tables or publish content.
 - `validateGamePackage()` checks structure, duplicate keys, supported enum values, broken references, player-private character requirements, final reveal references, and AI-review warnings.
 - `/admin/games/package` provides a content-admin dry-run screen for pasted JSON or uploaded `.json` package files.
 - `POST /admin/games/package/validate` validates the submitted package, returns a JSON report, enforces content-admin access and CSRF, and audits the dry-run without storing package content.
+- `POST /admin/games/package/import` validates the same package format and creates a new draft `Game` plus draft `GameVersion` only when validation passes and the slug is unused.
+- `app/lib/game-package-import.ts` imports characters, rounds, cards, evidence, media assets, digital artifacts, character tools, unlock rules, final reveal content, source metadata, themes, and content warnings.
+- Imported conditional content is created in two phases so unlock rules can target created content and cards/evidence/media/artifacts can be backfilled with their `requiredUnlockRuleId`.
 - `tests/game-package.test.ts` covers accepted AI-assisted packages, duplicate keys, broken references, unsupported schema versions, and unsafe player/duration ranges.
+- `tests/game-package-import.test.ts` covers draft import creation, source metadata preservation, conditional unlock link wiring, invalid packages, and duplicate slugs.
 - Live access-control tests cover the admin-only dry-run route and validation endpoint.
-- This is still a contract and validation layer only. It does not import into PostgreSQL yet.
+- The importer is draft-only. It does not publish, create products, create parties, or grant customer access.
 
 ## Package Shape
 
@@ -49,9 +53,9 @@ Top-level fields:
 
 1. Keep the validator independent from database writes. Status: implemented.
 2. Add an admin-only dry-run upload/review route that displays validation results. Status: implemented.
-3. Add a draft-only importer that creates a new draft `GameVersion`.
-4. Preserve source metadata for imported/AI-assisted content.
-5. Run publish-readiness after import.
+3. Add a draft-only importer that creates a new draft `GameVersion`. Status: implemented for new draft games.
+4. Preserve source metadata for imported/AI-assisted content. Status: implemented on `GameVersion`.
+5. Run publish-readiness after import. Status: available after redirecting to the admin game detail; deeper import-specific readiness messaging can still be polished.
 6. Add certified creator access to the same dry-run/import flow after the internal builder is stable.
 
 ## Example

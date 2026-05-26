@@ -16,7 +16,7 @@ Last inspected: 2026-05-22
 - Host run-of-show summary and player status summary.
 - Join/play pages have a first mobile/accessibility pass for tighter phone spacing, explicit form labels, full-width mobile actions, and safer media sizing.
 - Game Builder Wizard and Conditional Reveal Engine foundations now exist for digital artifacts, character tools, unlock rules, player inventory, tool instances, code attempts, asset views, player interactions, and unlock events.
-- Game Package import contract, validator, and admin dry-run package review screen now exist for future AI-assisted draft creation.
+- Game Package import contract, validator, admin dry-run package review screen, and draft-only importer now exist for future AI-assisted draft creation.
 - Admin game detail pages now include draft-only editors for digital artifacts, character tools, and unlock rules.
 - Admin builder preview pages can simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
 - Publish-readiness validation blocks unsafe game-version publishing when required content or conditional unlock wiring is incomplete.
@@ -230,7 +230,8 @@ Last inspected: 2026-05-22
    - Publishing now checks required content, final reveal presence, version-owned linkages, orphan required unlocks, unpublished required rules, unattached published rules, and access-code generator requirements.
    - Game Package schema validation now exists for AI-assisted drafts; it validates structure, duplicate keys, references, visibility rules, source metadata, and final reveal references without writing to the database.
    - `/admin/games/package` lets content admins dry-run pasted JSON or uploaded `.json` packages, and `POST /admin/games/package/validate` returns validation reports without creating game records.
-   - Next implementation step: add a draft-only Game Package importer, while continuing conditional reveal work for asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, and deeper readiness checks for circular dependencies and spoiler wording.
+   - `POST /admin/games/package/import` now creates a new draft game/version from a valid package, preserves source metadata/content warnings, wires conditional unlock targets, redirects to admin game detail, and leaves publishing/manual review separate.
+   - Next implementation step: continue conditional reveal work for asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, deeper readiness checks for circular dependencies and spoiler wording, and then polish imported draft review workflows.
 
 22. Add a certified creator dashboard after the internal builder is stable.
    - Future `/creator` routes should be hidden unless the signed-in user has a certified/approved creator profile.

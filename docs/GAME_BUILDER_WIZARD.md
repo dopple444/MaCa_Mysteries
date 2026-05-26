@@ -33,6 +33,7 @@ Implemented foundation:
 - Host party pages show sanitized code-attempt and unlock-event activity; spoiler-sensitive rule/tool labels stay generic unless host spoiler mode is unlocked.
 - Tests cover role visibility separation, a cross-player access-code unlock flow, player tool panel/code-entry behavior, admin builder editor validation, builder preview projections, and publish-readiness validation.
 - Game Package validation now has an admin-only dry-run page at `/admin/games/package` and a CSRF-protected validation route at `POST /admin/games/package/validate`.
+- The same admin page can now import a structurally valid package into a new draft game through `POST /admin/games/package/import`; publishing remains a separate manual review step.
 
 ## Builder Wizard Scope
 
@@ -55,7 +56,7 @@ The wizard should eventually walk an admin through:
 
 Future AI tools should integrate through a reviewable package format rather than direct database writes.
 
-The first validator lives in `app/lib/game-package.ts`; content admins can dry-run package files through `/admin/games/package`; the detailed contract is documented in `docs/GAME_PACKAGE_IMPORT.md`.
+The first validator lives in `app/lib/game-package.ts`; the draft-only importer lives in `app/lib/game-package-import.ts`; content admins can dry-run and import package files through `/admin/games/package`; the detailed contract is documented in `docs/GAME_PACKAGE_IMPORT.md`.
 
 The package should include:
 
@@ -121,5 +122,5 @@ The engine should support:
 3. Add runtime support for asset-view, host-approval, reveal-state, and multi-player interaction rules.
 4. Add object storage and signed private media URLs before production private media.
 5. Add admin-only Game Package dry-run upload/review UI. Status: implemented.
-6. Add a draft-only Game Package importer for AI-assisted drafts.
+6. Add a draft-only Game Package importer for AI-assisted drafts. Status: implemented for new draft games.
 7. Add certified creator dashboard permissions only after the first-party builder is stable.

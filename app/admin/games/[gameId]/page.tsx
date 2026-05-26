@@ -144,7 +144,7 @@ export default async function AdminGameDetailPage({
   searchParams
 }: {
   params: Promise<{ gameId: string }>;
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<{ error?: string; imported?: string }>;
 }) {
   const user = await requireUser();
   if (!hasAdminPermission(user, "content")) notFound();
@@ -283,6 +283,11 @@ export default async function AdminGameDetailPage({
             {errorMessage}
           </p>
         )}
+        {query?.imported === "1" && (
+          <p className="mt-6 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            Draft Game Package imported. Review the draft content before publishing.
+          </p>
+        )}
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-slate-950/80 p-4">
@@ -405,6 +410,12 @@ export default async function AdminGameDetailPage({
         <div className="mt-8 space-y-8">
           {game.versions.map((version) => {
             const readiness = readinessByVersionId.get(version.id);
+            const contentWarnings = Array.isArray(version.contentWarnings) ? version.contentWarnings.join(", ") : "";
+            const sourceDetails = [
+              version.sourceKind,
+              version.sourceToolName,
+              version.sourceToolVersion
+            ].filter(Boolean).join(" · ");
 
             return (
             <section key={version.id} className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
@@ -414,6 +425,8 @@ export default async function AdminGameDetailPage({
                   <p className="mt-2 text-sm text-slate-400">
                     {Array.isArray(version.themes) ? version.themes.join(", ") : ""}
                   </p>
+                  {contentWarnings && <p className="mt-2 text-sm text-amber-100">Warnings: {contentWarnings}</p>}
+                  {sourceDetails && <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">{sourceDetails}</p>}
                   <Link
                     href={`/admin/games/${game.id}/versions/${version.id}/preview`}
                     className="mt-3 inline-flex rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white hover:border-white"

@@ -168,6 +168,6 @@ Recommended first implementation order:
 11. Conditional unlock/code-entry player UI.
 12. Deeper publish-readiness checks for non-code conditional rule types.
 13. Final reveal editor.
-14. Game Package import for AI-assisted draft creation.
+14. Game Package import for AI-assisted draft creation. Status: admin-only dry-run and new draft game import foundation exists; review workflow polish remains.
 15. Certified creator dashboard only after the internal builder and conditional engine are stable.
 16. Creator marketplace selling only after certified creator workflows, approvals, support, and operations are stable.

@@ -153,24 +153,29 @@ model Game {
 }
 
 model GameVersion {
-  id               String                @id @default(cuid())
-  gameId           String
-  game             Game                  @relation(fields: [gameId], references: [id])
-  versionNumber    Int
-  status           String                @default("DRAFT")
-  themes           Json                  @default("[]")
-  publishedAt      DateTime?
-  parties          Party[]
-  characters       GameCharacter[]
-  rounds           GameRound[]
-  evidence         GameEvidence[]
-  finalReveal      GameFinalReveal?
-  mediaAssets      GameMediaAsset[]
-  digitalArtifacts GameDigitalArtifact[]
-  characterTools   GameCharacterTool[]
-  unlockRules      GameUnlockRule[]
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id                String                @id @default(cuid())
+  gameId            String
+  game              Game                  @relation(fields: [gameId], references: [id])
+  versionNumber     Int
+  status            String                @default("DRAFT")
+  themes            Json                  @default("[]")
+  contentWarnings   Json                  @default("[]")
+  sourceKind        String                @default("MANUAL")
+  sourceToolName    String                @default("")
+  sourceToolVersion String                @default("")
+  sourceNotes       String                @default("")
+  publishedAt       DateTime?
+  parties           Party[]
+  characters        GameCharacter[]
+  rounds            GameRound[]
+  evidence          GameEvidence[]
+  finalReveal       GameFinalReveal?
+  mediaAssets       GameMediaAsset[]
+  digitalArtifacts  GameDigitalArtifact[]
+  characterTools    GameCharacterTool[]
+  unlockRules       GameUnlockRule[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([gameId, versionNumber])
 }
