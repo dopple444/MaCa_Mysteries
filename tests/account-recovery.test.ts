@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   createAccountRecoveryCase,
   getAccountRecoveryReport,
+  getAccountRecoveryRiskSummary,
+  queueAccountRecoveryRiskAlert,
   queueAccountRecoveryEmailVerification,
   queueAccountRecoveryPasswordReset,
   reviewAccountRecoveryCase
@@ -284,7 +286,12 @@ test("account recovery report summarizes active, stale, and recent actioned case
       ]
     });
 
-    const report = await getAccountRecoveryReport({ now, staleAfterHours: 48, recentDays: 7 });
+    const report = await getAccountRecoveryReport({
+      now,
+      staleAfterHours: 48,
+      recentDays: 7,
+      emailDomain: fixture.emailDomain
+    });
 
     assert.equal(report.openCaseCount, 2);
     assert.equal(report.actionedCaseCount, 2);
@@ -295,8 +302,112 @@ test("account recovery report summarizes active, stale, and recent actioned case
     assert.equal(report.emailVerificationQueuedRecentCount, 1);
     assert.equal(report.closedRecentCount, 1);
     assert.equal(report.deniedRecentCount, 1);
+    assert.equal(report.repeatedEmailRiskCount, 0);
+    assert.equal(report.failedVerificationRiskCount, 1);
+    assert.equal(report.shouldQueueRiskAlert, false);
     assert.equal(report.staleCutoff.toISOString(), "2026-05-24T12:00:00.000Z");
     assert.equal(report.recentCutoff.toISOString(), "2026-05-19T12:00:00.000Z");
+  } finally {
+    await deleteCommerceFixture(fixture.label, fixture.emailDomain);
+  }
+});
+
+test("account recovery risk summary and alerts flag repeated requests", async () => {
+  const fixture = await createAccountRecoveryFixture("account-recovery-risk");
+  const now = new Date("2026-05-26T12:00:00.000Z");
+  const repeatedEmail = `repeat${fixture.emailDomain}`;
+  const alertRecipient = `security${fixture.emailDomain}`;
+
+  try {
+    await prisma.accountRecoveryCase.createMany({
+      data: [
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          reviewedByUserId: fixture.support.id,
+          email: repeatedEmail,
+          status: "CLOSED",
+          verificationStatus: "VERIFIED",
+          createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+          reviewedAt: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000)
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          reviewedByUserId: fixture.support.id,
+          email: repeatedEmail,
+          status: "DENIED",
+          verificationStatus: "FAILED",
+          createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+          reviewedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          email: repeatedEmail,
+          status: "OPEN",
+          verificationStatus: "PENDING",
+          createdAt: now
+        }
+      ]
+    });
+
+    const summary = await getAccountRecoveryRiskSummary({
+      now,
+      windowDays: 30,
+      repeatedEmailThreshold: 3,
+      failedVerificationThreshold: 3,
+      emailDomain: fixture.emailDomain
+    });
+
+    assert.equal(summary.caseCount, 3);
+    assert.equal(summary.activeCaseCount, 1);
+    assert.equal(summary.repeatedEmailCount, 1);
+    assert.equal(summary.failedVerificationCount, 1);
+    assert.equal(summary.shouldAlert, true);
+
+    const result = await queueAccountRecoveryRiskAlert({
+      now,
+      windowDays: 30,
+      repeatedEmailThreshold: 3,
+      failedVerificationThreshold: 3,
+      emailDomain: fixture.emailDomain,
+      dedupeMinutes: 360,
+      env: {
+        ADMIN_ALERT_EMAILS: `${alertRecipient}, ${alertRecipient.toUpperCase()}`,
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+
+    assert.equal(result.status, "QUEUED");
+    assert.equal(result.queuedCount, 1);
+    assert.equal(result.skippedDuplicateCount, 0);
+
+    const message = await prisma.outboundMessage.findFirstOrThrow({
+      where: {
+        recipient: alertRecipient,
+        templateKey: "account_recovery_risk_alert"
+      }
+    });
+    assert.match(message.bodyPreview, /Repeated account emails: 1/);
+    assert.match(message.bodyPreview, /https:\/\/staging\.macamysteries\.com\/admin\/account-recovery/);
+
+    const duplicate = await queueAccountRecoveryRiskAlert({
+      now,
+      windowDays: 30,
+      repeatedEmailThreshold: 3,
+      failedVerificationThreshold: 3,
+      emailDomain: fixture.emailDomain,
+      dedupeMinutes: 360,
+      env: {
+        ADMIN_ALERT_EMAILS: alertRecipient,
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+
+    assert.equal(duplicate.status, "DUPLICATE");
+    assert.equal(duplicate.queuedCount, 0);
+    assert.equal(duplicate.skippedDuplicateCount, 1);
   } finally {
     await deleteCommerceFixture(fixture.label, fixture.emailDomain);
   }

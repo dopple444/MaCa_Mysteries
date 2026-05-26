@@ -35,6 +35,10 @@ function getStatusMessage(error?: string, updated?: string) {
   if (updated === "reset") return "Password reset email queued.";
   if (updated === "verification") return "Email verification message queued.";
   if (updated === "already-verified") return "That account email is already verified.";
+  if (updated === "risk-alert") return "Account recovery risk alert queued.";
+  if (updated === "risk-alert-duplicate") return "A recent account recovery risk alert already exists.";
+  if (updated === "risk-alert-none") return "No account recovery risk alert is needed right now.";
+  if (error === "alerts-not-configured") return "Set ADMIN_ALERT_EMAILS before queuing account recovery risk alerts.";
   return "";
 }
 
@@ -55,6 +59,8 @@ function getAuditTitle(action: string) {
       return "Email verification queued";
     case "accountRecovery.case.closed":
       return "Case closed";
+    case "accountRecovery.riskAlertQueued":
+      return "Risk alert queued";
     default:
       return action.replaceAll(".", " ");
   }
@@ -102,9 +108,20 @@ export default async function AdminAccountRecoveryPage({
         <section className="mt-8 rounded-2xl bg-slate-950/70 p-5">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-white">Recovery report</h2>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-              Since {formatActivityTime(recoveryReport.recentCutoff)}
-            </p>
+            <div className="flex flex-col gap-3 sm:items-end">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                Since {formatActivityTime(recoveryReport.recentCutoff)}
+              </p>
+              <form action="/admin/account-recovery/alerts" method="post">
+                <input type="hidden" name="csrfToken" value={csrfToken} />
+                <button
+                  disabled={!recoveryReport.shouldQueueRiskAlert}
+                  className="rounded-full border border-yellow-300/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-yellow-100 hover:border-yellow-200 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
+                >
+                  Queue risk alert
+                </button>
+              </form>
+            </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {[
@@ -120,12 +137,14 @@ export default async function AdminAccountRecoveryPage({
               </div>
             ))}
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             {[
               ["Reset emails", recoveryReport.passwordResetQueuedRecentCount],
               ["Verification emails", recoveryReport.emailVerificationQueuedRecentCount],
               ["Closed", recoveryReport.closedRecentCount],
-              ["Denied", recoveryReport.deniedRecentCount]
+              ["Denied", recoveryReport.deniedRecentCount],
+              [`Repeat emails ${recoveryReport.riskWindowDays}d`, recoveryReport.repeatedEmailRiskCount],
+              [`Failed ID ${recoveryReport.riskWindowDays}d`, recoveryReport.failedVerificationRiskCount]
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl bg-slate-900/80 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>

@@ -41,7 +41,7 @@ Last inspected: 2026-05-22
 - Invitation email drafts are queued in `OutboundMessage` when parties are created, guests are added, or invites are resent, and guest records track invitation queued/sent/failed status.
 - Outbound email/SMS provider helpers, queued email creation, console/Resend email delivery, sent/failed markers, and retry controls exist.
 - Account email verification and password reset flows use signed links and queued email messages.
-- Support-gated account recovery cases exist for ticket-linked identity review, safe reset/verification email queueing, and recovery audit history.
+- Support-gated account recovery cases exist for ticket-linked identity review, safe reset/verification email queueing, active/stale/risk reporting, deduped risk alerting, and recovery audit history.
 - User sessions now retain IP address, user-agent, created-by, last-seen, expiration, and revocation metadata.
 - Login now tracks consecutive failed attempts and temporarily locks accounts after repeated failures.
 - Repeated-login lockouts now queue deduped account-security alert emails when `ADMIN_ALERT_EMAILS` is configured.
@@ -108,11 +108,11 @@ Last inspected: 2026-05-22
    - Verification/reset messages are queued as `OutboundMessage` emails for console/Resend delivery.
    - Password reset revokes existing sessions and signs the user in with the new password.
    - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
-   - `/admin/account-recovery` lets support-capable admins create recovery cases, link matching support tickets, mark identity verification state, queue password reset/email verification messages, review active/stale/recent recovery counts, and close cases without exposing signed recovery links.
+   - `/admin/account-recovery` lets support-capable admins create recovery cases, link matching support tickets, mark identity verification state, queue password reset/email verification messages, review active/stale/recent/repeated-request recovery counts, queue deduped risk alerts, and close cases without exposing signed recovery links.
    - Session metadata and the first account lockout policy are implemented.
    - Repeated-login lockouts queue deduped account-security alert emails to configured admin alert recipients.
    - Password reset invalidates active sessions for the affected account.
-   - Next: run a recovery drill, add session rotation after additional sensitive changes, and deepen risk scoring before production launch.
+   - Next: run a recovery drill, add session rotation after additional sensitive changes, and deepen behavioral risk scoring before production launch.
 
 8. Choose and implement the SMS provider.
    - Pick Twilio or another provider.
@@ -188,7 +188,7 @@ Last inspected: 2026-05-22
    - Account recovery case actions are audit logged and included in the account-security trail.
    - Active session metadata, failed-attempt counts, account lock status, and recent session context are visible in `/admin/users`.
    - Approved role changes invalidate active sessions for the target account.
-   - Next: add broader login/security event monitoring, recovery drill reporting, and deeper risk scoring.
+   - Next: add broader login/security event monitoring, run the recovery drill, and deepen behavioral risk scoring.
 
 18. Prepare production process, network layer, and security gates.
    - Status: in progress.

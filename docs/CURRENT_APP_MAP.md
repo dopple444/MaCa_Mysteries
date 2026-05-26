@@ -116,7 +116,7 @@ Key dependency versions from `package.json`:
 | `app/lib/admin-alerts.ts` | Shared admin alert recipient, admin URL, and dedupe-window helpers for operations email queues. |
 | `app/lib/account-security.ts` | Signed account-action tokens, email verification queueing, password reset queueing, and password reset fulfillment. |
 | `app/lib/account-security-actions.ts` | Server actions for verification resend, password reset request, and password reset confirmation. |
-| `app/lib/account-recovery.ts` | Support-gated account recovery case service for ticket-linked case creation, identity review, safe reset/verification email queueing, and recovery audit events. |
+| `app/lib/account-recovery.ts` | Support-gated account recovery case service for ticket-linked case creation, identity review, safe reset/verification email queueing, recovery reports, repeated-request risk summaries, deduped risk alerts, and recovery audit events. |
 | `app/lib/guest-auth.ts` | Guest cookie/session helpers for joined player access. |
 | `app/lib/join-actions.ts` | Server action for joining a party by invite code, name, and email. |
 | `app/lib/party-actions.ts` | Server actions for creating parties and adding guests. Generates invite codes and guest tokens. |
@@ -269,7 +269,7 @@ The current Prisma schema contains:
 
 `Guest` now carries both party participation status and invitation delivery state: queued/sent/failed status, last queued/sent timestamps, resend count, and last failure detail.
 
-Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, account recovery drill/reporting polish, and future marketplace entities.
+Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, account recovery drill evidence, and future marketplace entities.
 
 ## Current Architectural Assessment
 
@@ -295,6 +295,6 @@ Gaps:
 - Real payment processing needs Stripe test credentials and dashboard/webhook verification before selling games.
 - Email records can be queued, delivered through console dry-run or Resend, failed, and retried. Support replies queue customer emails and internal notes stay local. SMS records can be queued, failed, and retried, but no real SMS provider adapter is enabled yet.
 - Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
-- Auth now has email verification, password reset, consecutive-failure account lockout, deduped account lockout alert emails, session metadata/revocation records, session invalidation after role changes/password reset/logout, super-admin role assignment, sensitive role-change approval requests, super-admin session revocation, support/admin recovery case tooling, login/logout/account audit events, and visible account-security audit history foundations. It still lacks OAuth and deeper risk scoring.
+- Auth now has email verification, password reset, consecutive-failure account lockout, deduped account lockout alert emails, session metadata/revocation records, session invalidation after role changes/password reset/logout, super-admin role assignment, sensitive role-change approval requests, super-admin session revocation, support/admin recovery case tooling, recovery risk reporting/alerts, login/logout/account audit events, and visible account-security audit history foundations. It still lacks OAuth and more advanced behavioral risk scoring.
 - Admin role values and route gates now support full admin, content editor, finance, and support scopes.
 - A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.

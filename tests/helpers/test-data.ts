@@ -97,7 +97,11 @@ export async function deleteCommerceFixture(slugPrefix: string, emailDomain: str
   await prisma.game.deleteMany({ where: { id: { in: gameIds } } });
   await prisma.userSession.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.auditLog.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.outboundMessage.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.outboundMessage.deleteMany({
+    where: {
+      OR: [{ userId: { in: userIds } }, { recipient: { endsWith: emailDomain } }]
+    }
+  });
   const supportTickets = await prisma.supportTicket.findMany({
     where: { OR: [{ userId: { in: userIds } }, { email: { endsWith: emailDomain } }] },
     select: { id: true }

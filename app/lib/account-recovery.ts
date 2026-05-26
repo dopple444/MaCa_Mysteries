@@ -1,8 +1,10 @@
 import type { AccountRecoveryCase, Prisma } from "@prisma/client";
 
 import { hasAdminPermission } from "./admin-permissions";
+import { getAdminAlertRecipients, getAdminAlertUrl, getAlertDedupeCutoff } from "./admin-alerts";
 import { queueEmailVerificationMessage, queuePasswordResetMessage } from "./account-security";
 import { logAuditEvent } from "./audit-log";
+import { queueEmailMessage } from "./outbound-delivery";
 import { prisma } from "./prisma";
 
 type UserLike = {
@@ -33,6 +35,23 @@ type AccountRecoveryReportInput = {
   now?: Date;
   staleAfterHours?: number;
   recentDays?: number;
+  riskWindowDays?: number;
+  repeatedEmailThreshold?: number;
+  failedVerificationThreshold?: number;
+  emailDomain?: string;
+};
+
+type AccountRecoveryRiskSummaryInput = {
+  now?: Date;
+  windowDays?: number;
+  repeatedEmailThreshold?: number;
+  failedVerificationThreshold?: number;
+  emailDomain?: string;
+};
+
+type AccountRecoveryRiskAlertInput = AccountRecoveryRiskSummaryInput & {
+  env?: Partial<Record<string, string | undefined>>;
+  dedupeMinutes?: number;
 };
 
 const ACCOUNT_RECOVERY_REQUEST_TYPES = [
@@ -44,13 +63,18 @@ const ACCOUNT_RECOVERY_REQUEST_TYPES = [
 
 const ACCOUNT_RECOVERY_STATUSES = ["OPEN", "ACTIONED", "CLOSED", "DENIED"] as const;
 const ACCOUNT_RECOVERY_VERIFICATION_STATUSES = ["PENDING", "VERIFIED", "FAILED"] as const;
+const DEFAULT_ACCOUNT_RECOVERY_RISK_WINDOW_DAYS = 30;
+const DEFAULT_ACCOUNT_RECOVERY_REPEATED_EMAIL_THRESHOLD = 3;
+const DEFAULT_ACCOUNT_RECOVERY_FAILED_VERIFICATION_THRESHOLD = 3;
+const DEFAULT_ACCOUNT_RECOVERY_RISK_ALERT_DEDUPE_MINUTES = 360;
 
 export const ACCOUNT_RECOVERY_AUDIT_ACTIONS = [
   "accountRecovery.case.created",
   "accountRecovery.case.reviewed",
   "accountRecovery.passwordResetQueued",
   "accountRecovery.emailVerificationQueued",
-  "accountRecovery.case.closed"
+  "accountRecovery.case.closed",
+  "accountRecovery.riskAlertQueued"
 ] as const;
 
 export function normalizeRecoveryEmail(email: string | null | undefined) {
@@ -78,6 +102,15 @@ function normalizeVerificationStatus(status: string | null | undefined) {
 function normalizeResolutionStatus(status: string | null | undefined) {
   const normalized = (status ?? "").trim().toUpperCase();
   return (ACCOUNT_RECOVERY_STATUSES as readonly string[]).includes(normalized) ? normalized : "";
+}
+
+function normalizePositiveNumber(value: number | undefined, fallback: number) {
+  return Number.isFinite(value) && value && value > 0 ? value : fallback;
+}
+
+function getAccountRecoveryEmailWhere(emailDomain: string | undefined) {
+  const normalized = emailDomain?.trim().toLowerCase();
+  return normalized ? { email: { endsWith: normalized } } : {};
 }
 
 function canManageAccountRecovery(user: UserLike | null | undefined) {
@@ -177,69 +210,214 @@ export async function getRecentAccountRecoveryAuditEvents(take = 12) {
   });
 }
 
+export async function getAccountRecoveryRiskSummary(input: AccountRecoveryRiskSummaryInput = {}) {
+  const now = input.now ?? new Date();
+  const windowDays = normalizePositiveNumber(input.windowDays, DEFAULT_ACCOUNT_RECOVERY_RISK_WINDOW_DAYS);
+  const repeatedEmailThreshold = normalizePositiveNumber(
+    input.repeatedEmailThreshold,
+    DEFAULT_ACCOUNT_RECOVERY_REPEATED_EMAIL_THRESHOLD
+  );
+  const failedVerificationThreshold = normalizePositiveNumber(
+    input.failedVerificationThreshold,
+    DEFAULT_ACCOUNT_RECOVERY_FAILED_VERIFICATION_THRESHOLD
+  );
+  const cutoff = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+  const emailWhere = getAccountRecoveryEmailWhere(input.emailDomain);
+  const recentCases = await prisma.accountRecoveryCase.findMany({
+    where: {
+      ...emailWhere,
+      createdAt: { gte: cutoff }
+    },
+    select: {
+      email: true,
+      verificationStatus: true,
+      status: true
+    }
+  });
+  const countsByEmail = new Map<string, number>();
+
+  for (const recoveryCase of recentCases) {
+    const email = normalizeRecoveryEmail(recoveryCase.email);
+    if (!email) continue;
+    countsByEmail.set(email, (countsByEmail.get(email) ?? 0) + 1);
+  }
+
+  const repeatedEmailCount = [...countsByEmail.values()].filter((count) => count >= repeatedEmailThreshold).length;
+  const failedVerificationCount = recentCases.filter((recoveryCase) => recoveryCase.verificationStatus === "FAILED").length;
+  const activeCaseCount = recentCases.filter(
+    (recoveryCase) => recoveryCase.status === "OPEN" || recoveryCase.status === "ACTIONED"
+  ).length;
+
+  return {
+    caseCount: recentCases.length,
+    activeCaseCount,
+    repeatedEmailCount,
+    failedVerificationCount,
+    windowDays,
+    repeatedEmailThreshold,
+    failedVerificationThreshold,
+    cutoff,
+    shouldAlert: repeatedEmailCount > 0 || failedVerificationCount >= failedVerificationThreshold
+  };
+}
+
+export async function queueAccountRecoveryRiskAlert(input: AccountRecoveryRiskAlertInput = {}) {
+  const env = input.env ?? process.env;
+  const now = input.now ?? new Date();
+  const recipients = getAdminAlertRecipients(env);
+  const summary = await getAccountRecoveryRiskSummary({ ...input, now });
+
+  if (!recipients.length) {
+    return {
+      status: "NOT_CONFIGURED" as const,
+      queuedCount: 0,
+      skippedDuplicateCount: 0,
+      recipients,
+      summary
+    };
+  }
+
+  if (!summary.shouldAlert) {
+    return {
+      status: "NO_ALERTS" as const,
+      queuedCount: 0,
+      skippedDuplicateCount: 0,
+      recipients,
+      summary
+    };
+  }
+
+  const adminUrl = getAdminAlertUrl(env, "/admin/account-recovery");
+  const bodyPreview = [
+    "Account recovery attention needed.",
+    `${summary.caseCount} recovery cases in ${summary.windowDays} days.`,
+    `Repeated account emails: ${summary.repeatedEmailCount}.`,
+    `Failed identity checks: ${summary.failedVerificationCount}.`,
+    `Active cases: ${summary.activeCaseCount}.`,
+    `Review: ${adminUrl}`
+  ].join(" ");
+  const dedupeCutoff = getAlertDedupeCutoff(
+    now,
+    input.dedupeMinutes,
+    DEFAULT_ACCOUNT_RECOVERY_RISK_ALERT_DEDUPE_MINUTES
+  );
+  let queuedCount = 0;
+  let skippedDuplicateCount = 0;
+
+  for (const recipient of recipients) {
+    const existing = await prisma.outboundMessage.findFirst({
+      where: {
+        channel: "EMAIL",
+        recipient,
+        templateKey: "account_recovery_risk_alert",
+        createdAt: { gte: dedupeCutoff }
+      },
+      select: { id: true }
+    });
+
+    if (existing) {
+      skippedDuplicateCount += 1;
+      continue;
+    }
+
+    const message = await queueEmailMessage({
+      recipient,
+      templateKey: "account_recovery_risk_alert",
+      subject: "MaCa Mysteries account recovery alert",
+      bodyPreview
+    });
+
+    if (message) queuedCount += 1;
+  }
+
+  return {
+    status: queuedCount ? ("QUEUED" as const) : ("DUPLICATE" as const),
+    queuedCount,
+    skippedDuplicateCount,
+    recipients,
+    summary
+  };
+}
+
 export async function getAccountRecoveryReport(input: AccountRecoveryReportInput = {}) {
   const now = input.now ?? new Date();
-  const staleAfterHours =
-    Number.isFinite(input.staleAfterHours) && input.staleAfterHours && input.staleAfterHours > 0
-      ? input.staleAfterHours
-      : 48;
-  const recentDays =
-    Number.isFinite(input.recentDays) && input.recentDays && input.recentDays > 0 ? input.recentDays : 7;
+  const staleAfterHours = normalizePositiveNumber(input.staleAfterHours, 48);
+  const recentDays = normalizePositiveNumber(input.recentDays, 7);
   const staleCutoff = new Date(now.getTime() - staleAfterHours * 60 * 60 * 1000);
   const recentCutoff = new Date(now.getTime() - recentDays * 24 * 60 * 60 * 1000);
+  const emailWhere = getAccountRecoveryEmailWhere(input.emailDomain);
 
   const [
-    openCaseCount,
-    actionedCaseCount,
-    pendingVerificationCount,
-    verifiedOpenCaseCount,
-    staleOpenCaseCount,
-    passwordResetQueuedRecentCount,
-    emailVerificationQueuedRecentCount,
-    closedRecentCount,
-    deniedRecentCount
-  ] = await prisma.$transaction([
-    prisma.accountRecoveryCase.count({ where: { status: "OPEN" } }),
-    prisma.accountRecoveryCase.count({ where: { status: "ACTIONED" } }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        status: { in: ["OPEN", "ACTIONED"] },
-        verificationStatus: "PENDING"
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        status: "OPEN",
-        verificationStatus: "VERIFIED"
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        status: { in: ["OPEN", "ACTIONED"] },
-        createdAt: { lt: staleCutoff }
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        passwordResetQueuedAt: { gte: recentCutoff }
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        emailVerificationQueuedAt: { gte: recentCutoff }
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        status: "CLOSED",
-        reviewedAt: { gte: recentCutoff }
-      }
-    }),
-    prisma.accountRecoveryCase.count({
-      where: {
-        status: "DENIED",
-        reviewedAt: { gte: recentCutoff }
-      }
+    [
+      openCaseCount,
+      actionedCaseCount,
+      pendingVerificationCount,
+      verifiedOpenCaseCount,
+      staleOpenCaseCount,
+      passwordResetQueuedRecentCount,
+      emailVerificationQueuedRecentCount,
+      closedRecentCount,
+      deniedRecentCount
+    ],
+    riskSummary
+  ] = await Promise.all([
+    prisma.$transaction([
+      prisma.accountRecoveryCase.count({ where: { ...emailWhere, status: "OPEN" } }),
+      prisma.accountRecoveryCase.count({ where: { ...emailWhere, status: "ACTIONED" } }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          status: { in: ["OPEN", "ACTIONED"] },
+          verificationStatus: "PENDING"
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          status: "OPEN",
+          verificationStatus: "VERIFIED"
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          status: { in: ["OPEN", "ACTIONED"] },
+          createdAt: { lt: staleCutoff }
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          passwordResetQueuedAt: { gte: recentCutoff }
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          emailVerificationQueuedAt: { gte: recentCutoff }
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          status: "CLOSED",
+          reviewedAt: { gte: recentCutoff }
+        }
+      }),
+      prisma.accountRecoveryCase.count({
+        where: {
+          ...emailWhere,
+          status: "DENIED",
+          reviewedAt: { gte: recentCutoff }
+        }
+      })
+    ]),
+    getAccountRecoveryRiskSummary({
+      now,
+      windowDays: input.riskWindowDays,
+      repeatedEmailThreshold: input.repeatedEmailThreshold,
+      failedVerificationThreshold: input.failedVerificationThreshold,
+      emailDomain: input.emailDomain
     })
   ]);
 
@@ -253,6 +431,13 @@ export async function getAccountRecoveryReport(input: AccountRecoveryReportInput
     emailVerificationQueuedRecentCount,
     closedRecentCount,
     deniedRecentCount,
+    repeatedEmailRiskCount: riskSummary.repeatedEmailCount,
+    failedVerificationRiskCount: riskSummary.failedVerificationCount,
+    shouldQueueRiskAlert: riskSummary.shouldAlert,
+    riskWindowDays: riskSummary.windowDays,
+    repeatedEmailThreshold: riskSummary.repeatedEmailThreshold,
+    failedVerificationThreshold: riskSummary.failedVerificationThreshold,
+    riskCutoff: riskSummary.cutoff,
     staleCutoff,
     recentCutoff
   };

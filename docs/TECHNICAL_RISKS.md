@@ -39,8 +39,8 @@ Current risk:
 - Custom auth has session metadata, password hashing, HTTP-only cookies, CSRF, rate limiting, consecutive-failure account lockout, and deduped lockout alert emails.
 - It has email verification and password reset foundations.
 - Sign-in success/failure/rate-limit events, logout, account creation, email verification, password reset, role-change requests/approvals/denials, session revocations, and account recovery actions are audit logged and visible to the appropriate admin scopes.
-- Support-gated account recovery cases now exist for ticket-linked identity review, safe reset/verification email queueing, recovery audit review, and active/stale/recent-action reporting.
-- It still lacks OAuth, completed recovery drill evidence, and deeper risk scoring/alerting.
+- Support-gated account recovery cases now exist for ticket-linked identity review, safe reset/verification email queueing, recovery audit review, active/stale/recent-action reporting, repeated-request risk summaries, and deduped risk-alert queueing.
+- It still lacks OAuth, completed recovery drill evidence, and deeper behavioral risk scoring/alerting.
 
 Mitigation:
 
@@ -220,11 +220,11 @@ Current state:
 Remaining risk:
 
 - Super-admin UI now exists for requesting/approving sensitive role changes, revoking sessions, searching/filtering accounts, and reviewing recent role/session audit history.
-- Support-gated account recovery, session metadata, consecutive-failure lockout, lockout alerting, and role-change/password-reset session invalidation exist, but risk-scored alerting is still shallow.
+- Support-gated account recovery, recovery-risk alerting, session metadata, consecutive-failure lockout, lockout alerting, and role-change/password-reset session invalidation exist, but behavioral risk scoring is still shallow.
 
 Mitigation:
 
-- Run the documented recovery drill using the account recovery report, then add broader login/security event monitoring and deeper risk-scored alerts.
+- Run the documented recovery drill using the account recovery report, then add broader login/security event monitoring and deeper behavioral risk-scored alerts.
 - Continue authorization tests for every new mutation route.
 - Keep audit logging on sensitive admin actions.
 

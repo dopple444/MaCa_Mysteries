@@ -12,7 +12,7 @@ This document describes the safe operating procedure for account recovery before
 - Password reset changes the password, marks existing sessions revoked, clears login lockout state, writes an audit event, and signs the user in with the new password.
 - Reset and verification emails are queued as `OutboundMessage` records and delivered through the configured email provider.
 - Admin/support account recovery cases are tracked in `AccountRecoveryCase`.
-- `/admin/account-recovery` lets support-capable admins create cases, link support tickets, record identity review status, and queue password reset or email verification messages.
+- `/admin/account-recovery` lets support-capable admins create cases, link support tickets, record identity review status, queue password reset or email verification messages, review recovery risk counts, and queue deduped risk alerts.
 - Password reset emails from account recovery require the case to be marked `VERIFIED` first.
 - Recovery actions are audit logged with `accountRecovery.*` actions and never expose signed recovery links in admin UI.
 
@@ -51,7 +51,8 @@ The admin account recovery view now includes:
 - Active session metadata, order, party, and support-ticket account counts.
 - Recovery case creation and support-ticket linking.
 - Identity verification state.
-- Active, stale, pending-ID, and recent-action recovery report counts.
+- Active, stale, pending-ID, recent-action, repeated-email, and failed-ID recovery report counts.
+- Deduped account recovery risk alert queueing to `ADMIN_ALERT_EMAILS`.
 - Guarded resend verification/reset actions.
 - Audit log entries for recovery actions.
 
@@ -82,3 +83,4 @@ Use `/admin/users` for super-admin session revocation when a compromised session
 - Confirm super-admin session revocation remains available through `/admin/users` and retains revocation metadata.
 - Run an account recovery drill with a support ticket, verified case, queued reset email, and closed case.
 - Confirm the recovery report counts update for open, actioned, stale, closed, and denied cases.
+- Confirm repeated-email and failed-ID counts update, then queue a risk alert when thresholds are crossed.

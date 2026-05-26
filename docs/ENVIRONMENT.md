@@ -36,7 +36,7 @@ Outbound messages are queued in PostgreSQL. Email delivery supports local consol
 | `EMAIL_PROVIDER` | When enabling email | Use `console` for local dry-run delivery or `resend` for Resend HTTP delivery. |
 | `EMAIL_API_KEY` | When enabling Resend | Email provider credential. |
 | `EMAIL_FROM` | When enabling Resend | Verified sender address, such as `MaCa Mysteries <hello@example.com>`. |
-| `ADMIN_ALERT_EMAILS` | Recommended before live payment testing | Comma-separated operations recipients for queued payment-risk alert emails. |
+| `ADMIN_ALERT_EMAILS` | Recommended before live testing | Comma-separated operations recipients for queued payment-risk, account-security, conditional-unlock, and account-recovery risk alert emails. |
 | `SMS_PROVIDER` | Later | Provider name for SMS delivery, such as Twilio. |
 | `SMS_API_KEY` | Later | SMS provider credential. |
 
@@ -57,7 +57,7 @@ Local admin upload endpoints are enabled. Public local uploads are written under
 - Stripe webhooks are verified with `STRIPE_WEBHOOK_SECRET`, recorded idempotently in `PaymentWebhookEvent`, and can fulfill paid orders.
 - Email/SMS outbound provider helpers read `EMAIL_PROVIDER` and `SMS_PROVIDER`.
 - Invitation emails are queued as `OutboundMessage` records, update guest invitation delivery state, can be delivered through console or Resend email adapters, and can be retried from admin if marked failed.
-- Payment operations alerts can be queued to `ADMIN_ALERT_EMAILS` through the same outbound email pipeline.
+- Payment operations, account lockout, conditional unlock, and account recovery risk alerts can be queued to `ADMIN_ALERT_EMAILS` through the same outbound email pipeline.
 - Account email verification and password reset links are signed with `ACCOUNT_TOKEN_SECRET` and delivered through queued email messages.
 - SMS support has user phone/preference fields and an account notification settings screen, but sending remains disabled until a provider adapter exists.
 - Local admin uploads validate file name, MIME type, size, and public/private path rules. S3-compatible writes and private signed URL serving remain future work.
