@@ -9,6 +9,7 @@ import {
   verifyAccountActionToken,
   verifyUserEmail
 } from "../app/lib/account-security";
+import { logAuthAuditEvent } from "../app/lib/auth-audit";
 import { getPostLoginRedirectPath } from "../app/lib/auth-flow";
 import { hashPassword, verifyPassword } from "../app/lib/auth";
 import { deleteCommerceFixture, prisma, uniqueTestLabel } from "./helpers/test-data";
@@ -121,6 +122,33 @@ test("expired account action tokens are rejected", async () => {
     });
     const verifiedUser = await verifyAccountActionToken(token, "password-reset");
     assert.equal(verifiedUser, null);
+  } finally {
+    await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
+  }
+});
+
+test("auth audit events record normalized account security metadata", async () => {
+  const fixture = await createAccountSecurityFixture("account-security-auth-audit");
+
+  try {
+    await logAuthAuditEvent({
+      action: "auth.login.failed",
+      userId: fixture.user.id,
+      email: `HOST${fixture.emailDomain.toUpperCase()}`,
+      reason: "invalid_credentials"
+    });
+
+    const audit = await prisma.auditLog.findFirstOrThrow({
+      where: {
+        userId: fixture.user.id,
+        action: "auth.login.failed"
+      }
+    });
+
+    assert.equal(audit.entityType, "User");
+    assert.equal(audit.entityId, fixture.user.id);
+    assert.equal((audit.metadata as Record<string, string>).email, fixture.user.email);
+    assert.equal((audit.metadata as Record<string, string>).reason, "invalid_credentials");
   } finally {
     await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
   }

@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
 
-import { getPartyConditionalActivity } from "../app/lib/conditional-activity";
+import {
+  getAdminConditionalActivity,
+  getPartyConditionalActivity,
+  queueConditionalUnlockAlert
+} from "../app/lib/conditional-activity";
 import { getUnlockedRuleIdsForGuest } from "../app/lib/conditional-unlocks";
 import { getVisiblePlayerArtifacts } from "../app/lib/player-artifacts";
 import { getVisiblePlayerEvidence } from "../app/lib/player-evidence";
@@ -465,7 +469,70 @@ test("player tool panel creates display codes and unlocks locked content", async
       true
     );
     assert.equal(spoilerActivity?.codeAttempts.find((attempt) => attempt.status === "SUCCESS")?.toolLabel, "Digital Decoder");
+
+    const adminActivity = await getAdminConditionalActivity({ take: 20 });
+    assert.equal(adminActivity.counts.codeAttempts >= 6, true);
+    assert.equal(adminActivity.counts.unlockEvents >= 4, true);
+    assert.equal(adminActivity.counts.failedCodeAttempts >= 1, true);
+    assert.equal(
+      adminActivity.codeAttempts.some(
+        (attempt) => attempt.partyId === fixture.partyId && attempt.status === "SUCCESS" && attempt.ruleLabel === "Unlock Folder"
+      ),
+      true
+    );
+    assert.equal(
+      adminActivity.unlockEvents.some(
+        (event) => event.partyId === fixture.partyId && event.ruleLabel === "Unlock Folder"
+      ),
+      true
+    );
+    assert.equal("codeHash" in (adminActivity.codeAttempts[0] as Record<string, unknown>), false);
+
+    const alertRecipients = [`conditional-alert${fixture.emailDomain}`];
+    const alertResult = await queueConditionalUnlockAlert({
+      threshold: 1,
+      windowMinutes: 60,
+      dedupeMinutes: 120,
+      env: {
+        ADMIN_ALERT_EMAILS: alertRecipients.join(","),
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+
+    assert.equal(alertResult.status, "QUEUED");
+    assert.equal(alertResult.queuedCount, 1);
+    assert.equal(alertResult.summary.failedCodeAttemptCount >= 1, true);
+
+    const alertMessage = await prisma.outboundMessage.findFirstOrThrow({
+      where: {
+        recipient: alertRecipients[0],
+        templateKey: "conditional_unlock_alert"
+      }
+    });
+    assert.equal(alertMessage.subject, "MaCa Mysteries conditional unlock alert");
+    assert.match(alertMessage.bodyPreview, /failed code attempts/);
+    assert.match(alertMessage.bodyPreview, /https:\/\/staging\.macamysteries\.com\/admin/);
+
+    const duplicateAlertResult = await queueConditionalUnlockAlert({
+      threshold: 1,
+      windowMinutes: 60,
+      dedupeMinutes: 120,
+      env: {
+        ADMIN_ALERT_EMAILS: alertRecipients.join(","),
+        APP_URL: "https://staging.macamysteries.com"
+      }
+    });
+
+    assert.equal(duplicateAlertResult.status, "DUPLICATE");
+    assert.equal(duplicateAlertResult.queuedCount, 0);
+    assert.equal(duplicateAlertResult.skippedDuplicateCount, 1);
   } finally {
+    await prisma.outboundMessage.deleteMany({
+      where: {
+        recipient: { endsWith: fixture.emailDomain },
+        templateKey: "conditional_unlock_alert"
+      }
+    });
     await deleteCommerceFixture(fixture.slugPrefix, fixture.emailDomain);
   }
 });

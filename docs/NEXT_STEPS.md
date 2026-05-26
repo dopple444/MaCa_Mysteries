@@ -21,6 +21,7 @@ Last inspected: 2026-05-22
 - Publish-readiness validation blocks unsafe game-version publishing when required content or conditional unlock wiring is incomplete.
 - Player-facing character tool inventory and access-code entry now exist on `/play` for locked evidence, cards, media, and digital artifacts.
 - Host party control now includes spoiler-safe conditional unlock activity counts, recent unlock events, and recent code attempts.
+- Admin inventory now includes platform-wide conditional unlock monitoring and suspicious-attempt alert queueing for recent code attempts, failed attempts, and successful unlock events.
 - Party completion/reopen flow with `PartyResult` and completed-party mutation blocking.
 - Admin inventory with recent activity, orders, outbound messages, support queue, and content totals.
 - Admin game detail pages with game metadata editing, game-version status controls, and first-party game draft creation.
@@ -170,7 +171,10 @@ Last inspected: 2026-05-22
    - `UserRole` now includes `SUPER_ADMIN`, `CONTENT_EDITOR`, `SUPPORT`, and `FINANCE`.
    - Admin pages and mutation routes are gated by content, payment, support, and outbound-message permissions.
    - `ADMIN` remains fully compatible as a full-access operational role.
-   - Next: add super-admin-only role assignment, role-change audit history, and session revocation.
+   - Super-admin account operations now exist at `/admin/users` for role assignment, session revocation, search/filtering, and recent account-security audit review.
+   - If no `SUPER_ADMIN` exists yet, a current full `ADMIN` can bootstrap the first super-admin account.
+   - Role changes, session revocations, account creation, sign-in success/failure/rate-limit events, logout, email verification, and password reset events are audit logged and visible in the recent account-security trail.
+   - Next: add sensitive role-change approval workflow, account recovery case review, and broader login/security event monitoring.
 
 18. Prepare production process, network layer, and security gates.
    - Status: in progress.
@@ -201,8 +205,9 @@ Last inspected: 2026-05-22
    - Player-safe content helpers now hide conditionally locked cards/evidence/media until the player has the required unlock event.
    - `/play` now shows character-specific access-code generator tools, prompts players for locked evidence/card/media/artifact codes when applicable, and posts unlock attempts through a CSRF-protected, rate-limited route.
    - Host party pages now show sanitized conditional unlock activity without exposing raw codes or spoiler-sensitive rule titles unless host spoiler mode is unlocked.
+   - Admin inventory now shows platform-wide conditional unlock monitoring and deduped alert queueing for recent code attempts, failed attempts, and unlock events without exposing stored code hashes.
    - Admin game detail pages can create/update draft digital artifacts, character tools, and unlock rules.
    - Builder editor services validate draft locks, duplicate keys, version-owned linkages, player-private character requirements, valid rule targets, and access-code source tools.
    - Builder preview pages simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
    - Publishing now checks required content, final reveal presence, version-owned linkages, orphan required unlocks, unpublished required rules, unattached published rules, and access-code generator requirements.
-   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, admin/global monitoring of code attempts, and deeper readiness checks for circular dependencies and spoiler wording.
+   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, and deeper readiness checks for circular dependencies and spoiler wording.

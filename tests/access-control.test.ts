@@ -466,7 +466,15 @@ test(
 
     await deleteTestData(slugPrefix, emailDomain);
 
-    const [admin, host, contentEditor, finance, support] = await Promise.all([
+    const [superAdmin, admin, host, contentEditor, finance, support] = await Promise.all([
+      prisma.user.create({
+        data: {
+          name: "Admin Access Test Super",
+          email: `super${emailDomain}`,
+          role: "SUPER_ADMIN",
+          passwordHash: "test"
+        }
+      }),
       prisma.user.create({
         data: {
           name: "Admin Access Test Admin",
@@ -508,7 +516,8 @@ test(
         }
       })
     ]);
-    const [adminToken, hostToken, contentToken, financeToken, supportToken] = await Promise.all([
+    const [superAdminToken, adminToken, hostToken, contentToken, financeToken, supportToken] = await Promise.all([
+      createSession(superAdmin.id, `super-${label}`),
       createSession(admin.id, `admin-${label}`),
       createSession(host.id, `host-${label}`),
       createSession(contentEditor.id, `content-${label}`),
@@ -535,6 +544,7 @@ test(
       const adminHtml = await adminResponse.text();
       assert.match(adminHtml, /Admin inventory/);
       assert.match(adminHtml, /Content overview/);
+      assert.match(adminHtml, /Conditional unlock monitoring/);
 
       const contentResponse = await fetch(`${appUrl}/admin`, {
         headers: { cookie: sessionCookie(contentToken) },
@@ -544,6 +554,7 @@ test(
       const contentHtml = await contentResponse.text();
       assert.match(contentHtml, /Create game/);
       assert.doesNotMatch(contentHtml, /Payment operations/);
+      assert.doesNotMatch(contentHtml, /Conditional unlock monitoring/);
       assert.doesNotMatch(contentHtml, /Support queue/);
 
       const financeResponse = await fetch(`${appUrl}/admin`, {
@@ -554,6 +565,7 @@ test(
       const financeHtml = await financeResponse.text();
       assert.match(financeHtml, /Payment operations/);
       assert.doesNotMatch(financeHtml, /Create game/);
+      assert.doesNotMatch(financeHtml, /Conditional unlock monitoring/);
       assert.doesNotMatch(financeHtml, /Support queue/);
 
       const supportResponse = await fetch(`${appUrl}/admin`, {
@@ -566,6 +578,21 @@ test(
       assert.match(supportHtml, /Outbound messages/);
       assert.doesNotMatch(supportHtml, /Payment operations/);
       assert.doesNotMatch(supportHtml, /Create game/);
+
+      const superAdminUsersResponse = await fetch(`${appUrl}/admin/users`, {
+        headers: { cookie: sessionCookie(superAdminToken) },
+        redirect: "manual"
+      });
+      assert.equal(superAdminUsersResponse.status, 200);
+      const superAdminUsersHtml = await superAdminUsersResponse.text();
+      assert.match(superAdminUsersHtml, /User access/);
+      assert.match(superAdminUsersHtml, /Revoke sessions/);
+
+      const adminUsersResponse = await fetch(`${appUrl}/admin/users`, {
+        headers: { cookie: sessionCookie(adminToken) },
+        redirect: "manual"
+      });
+      assert.equal(adminUsersResponse.status, 404);
     } finally {
       await deleteTestData(slugPrefix, emailDomain);
     }

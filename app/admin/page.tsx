@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { hasAdminPermission, isOperationalAdminRole } from "../lib/admin-permissions";
+import { canManageAdminUsers } from "../lib/admin-users";
 import { requireUser } from "../lib/auth";
+import { getAdminConditionalActivity } from "../lib/conditional-activity";
 import { getCsrfToken } from "../lib/csrf";
 import {
   getPaymentOperationsAlertRecipients,
@@ -51,6 +53,26 @@ function getAuditLabel(action: string) {
       return "Order access reconciled";
     case "outbound.email.deliveryRun":
       return "Email delivery run";
+    case "admin.user.roleChanged":
+      return "User role changed";
+    case "admin.user.sessionsRevoked":
+      return "User sessions revoked";
+    case "account.created":
+      return "Account created";
+    case "account.email.verified":
+      return "Email verified";
+    case "account.password.reset":
+      return "Password reset";
+    case "auth.login.success":
+      return "Sign-in succeeded";
+    case "auth.login.failed":
+      return "Sign-in failed";
+    case "auth.login.rateLimited":
+      return "Sign-in rate limited";
+    case "auth.logout":
+      return "Signed out";
+    case "conditional.unlocks.alertQueued":
+      return "Conditional unlock alert queued";
     default:
       return action.replaceAll(".", " ");
   }
@@ -79,6 +101,7 @@ export default async function AdminPage({
   const canViewPayments = hasAdminPermission(user, "payment");
   const canViewSupport = hasAdminPermission(user, "support");
   const canViewOutbound = hasAdminPermission(user, "outbound");
+  const canManageUsers = await canManageAdminUsers(user);
   const messageStatus = params?.messageStatus?.trim().toUpperCase() ?? "";
   const messageChannel = params?.messageChannel?.trim().toUpperCase() ?? "";
   const orderStatus = params?.orderStatus?.trim().toUpperCase() ?? "";
@@ -100,6 +123,7 @@ export default async function AdminPage({
     games,
     totals,
     auditLogs,
+    conditionalActivity,
     recentOrders,
     outboundMessages,
     supportTickets,
@@ -169,6 +193,7 @@ export default async function AdminPage({
           }
         })
       : Promise.resolve([]),
+    canViewAudit ? getAdminConditionalActivity() : Promise.resolve(null),
     canViewPayments
       ? prisma.order.findMany({
           where: orderWhere,
@@ -324,6 +349,16 @@ export default async function AdminPage({
             </Link>
           </div>
         )}
+        {canManageUsers && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href="/admin/users"
+              className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
+            >
+              Manage users
+            </Link>
+          </div>
+        )}
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {statCards.map(([label, value]) => (
@@ -433,6 +468,119 @@ export default async function AdminPage({
               ) : (
                 <p className="rounded-2xl bg-slate-900/80 p-4 text-slate-300">No audit activity has been logged yet.</p>
               )}
+            </div>
+          </section>
+          )}
+
+          {canViewAudit && conditionalActivity && (
+          <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-white">Conditional unlock monitoring</h2>
+                <p className="mt-2 text-sm text-slate-400">
+                  Platform-wide code attempts and successful unlocks for spotting unusual gameplay activity.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                  {conditionalActivity.counts.failedCodeAttempts} failed
+                </span>
+                <form action="/admin/conditional-activity/alerts" method="post">
+                  <input type="hidden" name="csrfToken" value={csrfToken} />
+                  <button className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white hover:border-white">
+                    Queue alert
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Code attempts</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{conditionalActivity.counts.codeAttempts}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Failed attempts</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{conditionalActivity.counts.failedCodeAttempts}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Unlock events</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{conditionalActivity.counts.unlockEvents}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Recent attempts</h3>
+                <div className="mt-3 grid gap-3">
+                  {conditionalActivity.codeAttempts.length ? (
+                    conditionalActivity.codeAttempts.map((attempt) => (
+                      <article key={attempt.id} className="rounded-2xl bg-slate-900/80 p-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-white">{attempt.ruleLabel}</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              {attempt.actorLabel} in{" "}
+                              <Link href={`/host/party/${attempt.partyId}`} className="hover:text-indigo-200">
+                                {attempt.partyTitle}
+                              </Link>
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                            {attempt.status}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm text-slate-300">
+                          {attempt.targetTypeLabel} · {attempt.toolLabel} · Scope {attempt.unlockScope}
+                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                          {formatActivityTime(attempt.createdAt)}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                      No code attempts have been logged yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Recent unlocks</h3>
+                <div className="mt-3 grid gap-3">
+                  {conditionalActivity.unlockEvents.length ? (
+                    conditionalActivity.unlockEvents.map((event) => (
+                      <article key={event.id} className="rounded-2xl bg-slate-900/80 p-4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-white">{event.ruleLabel}</p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              {event.actorLabel} for {event.targetGuestLabel} in{" "}
+                              <Link href={`/host/party/${event.partyId}`} className="hover:text-indigo-200">
+                                {event.partyTitle}
+                              </Link>
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                            {event.status}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm text-slate-300">
+                          {event.targetTypeLabel} · Scope {event.unlockScope}
+                        </p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                          {formatActivityTime(event.createdAt)}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                      No conditional unlocks have been logged yet.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
           )}

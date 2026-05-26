@@ -2,8 +2,9 @@
 
 import { redirect } from "next/navigation";
 
-import { createSession, clearSession, hashPassword, verifyPassword } from "./auth";
 import { queueEmailVerificationMessage } from "./account-security";
+import { createSession, clearSession, getCurrentUser, hashPassword, verifyPassword } from "./auth";
+import { logAuthAuditEvent } from "./auth-audit";
 import { getPostLoginRedirectPath } from "./auth-flow";
 import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
@@ -16,6 +17,7 @@ function getFormValue(formData: FormData, key: string) {
 
 export async function login(formData: FormData) {
   if (!(await verifyCsrfToken(formData))) {
+    await logAuthAuditEvent({ action: "auth.login.failed", reason: "csrf" });
     redirect("/login?error=invalid");
   }
   const email = getFormValue(formData, "email").toLowerCase();
@@ -28,19 +30,33 @@ export async function login(formData: FormData) {
   });
 
   if (!rateLimit.allowed) {
+    await logAuthAuditEvent({ action: "auth.login.rateLimited", email, reason: "rate_limit" });
     redirect("/login?error=rate-limited");
   }
 
   if (!email || !password) {
+    await logAuthAuditEvent({ action: "auth.login.failed", email, reason: "missing_credentials" });
     redirect("/login?error=invalid");
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+    await logAuthAuditEvent({
+      action: "auth.login.failed",
+      userId: user?.id,
+      email,
+      reason: "invalid_credentials"
+    });
     redirect("/login?error=invalid");
   }
 
   await createSession(user.id);
+  await logAuthAuditEvent({
+    action: "auth.login.success",
+    userId: user.id,
+    email: user.email,
+    reason: user.emailVerifiedAt ? "verified" : "email_verification_required"
+  });
   const destination = getPostLoginRedirectPath(user);
   if (!user.emailVerifiedAt) {
     await queueEmailVerificationMessage(user.id);
@@ -85,6 +101,7 @@ export async function signup(formData: FormData) {
   });
 
   await createSession(user.id);
+  await logAuthAuditEvent({ action: "account.created", userId: user.id, email: user.email });
   redirect("/dashboard");
 }
 
@@ -92,6 +109,10 @@ export async function logout(formData: FormData) {
   if (!(await verifyCsrfToken(formData))) {
     redirect("/dashboard");
   }
+  const user = await getCurrentUser();
   await clearSession();
+  if (user) {
+    await logAuthAuditEvent({ action: "auth.logout", userId: user.id, email: user.email });
+  }
   redirect("/");
 }

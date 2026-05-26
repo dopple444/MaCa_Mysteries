@@ -15,7 +15,10 @@ This checklist captures the current security posture and the next hardening move
 - Access-code tool instances and attempts store salted hashes instead of raw codes.
 - Player code-entry is CSRF-protected, rate-limited, validates target availability server-side, and redirects through generic status messages.
 - Host conditional activity monitoring redacts rule/tool labels until host spoiler mode is unlocked and never returns stored code hashes.
-- Audit logs record core host, player, admin content, support, party status, invite resend, spoiler unlock, and outbound retry mutations.
+- Admin conditional activity monitoring shows recent platform-wide code attempts, failed attempts, and unlock events without selecting or exposing stored code hashes.
+- Repeated failed access-code attempts can queue deduped admin alert emails through `OutboundMessage`.
+- Audit logs record core host, player, admin content, support, party status, invite resend, spoiler unlock, outbound retry, and auth/account-security events.
+- Super-admin user operations can assign roles, revoke sessions, search/filter accounts, and review recent account-security audit events, with bootstrap access for the first super administrator.
 - Guest invitation delivery state is server-side and does not expose gameplay spoilers.
 - Database-backed rate limiting is active for login, signup, guest join, support ticket intake, and checkout-start.
 - Email verification and password reset use signed account-action links delivered through queued email.
@@ -36,7 +39,9 @@ This checklist captures the current security posture and the next hardening move
    - Email verification and password reset foundations are implemented.
    - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
    - Add admin recovery tooling before support staff handle real accounts.
-   - Add session revocation tooling for admins/support.
+   - Session revocation tooling now exists for super-admin account operations.
+   - Add richer account recovery review workflows before support staff handle sensitive account changes.
+   - Account-security audit history is visible to super admins; add approval workflow before delegated staff can perform sensitive role changes.
    - Consider session rotation after login and sensitive account changes.
 
 3. Secret management.
@@ -58,7 +63,7 @@ This checklist captures the current security posture and the next hardening move
 6. Conditional unlock abuse.
    - Player code-entry now has guest-scoped rate limiting; keep tuning limits as real gameplay patterns appear.
    - Keep raw codes out of logs, database records, and user-visible error messages.
-   - Host-side unlock monitoring exists; add admin/global monitoring and suspicious-attempt alerts.
+   - Host-side and admin/global unlock monitoring and suspicious-attempt alert queueing exist; add provider delivery monitoring and threshold tuning after real gameplay testing.
    - Admin builder editor services now validate version-owned targets/source tools and require access-code rules to use access-code generator tools.
    - Publish validation now blocks missing essential content, orphan required unlock rules, unpublished required rules, unattached published rules, and access-code rules without generator tools.
    - Expand publish validation for circular dependencies, spoiler wording, asset-view rules, host-approval rules, reveal-state rules, and multi-player interaction rules.
@@ -91,16 +96,18 @@ This checklist captures the current security posture and the next hardening move
 
 | Route | Current Risk | Next Hardening |
 | --- | --- | --- |
-| `/login` | Brute force attempts | Rate limit is active; add login audit events and account lockout policy later |
+| `/login` | Brute force attempts | Rate limit and login audit events are active; add account lockout policy later |
 | `/signup` | Spam accounts | Rate limit is active and signup queues email verification |
 | `/join` | Invite-code guessing | Rate limit is active; add suspicious attempt audit events |
 | `/play` | Guest token misuse | Token rotation/reissue flow later |
-| `/play/unlock` | Brute force or spoiler probing | Guest-scoped rate limiting, CSRF, raw-code hashing, target checks, and host activity monitoring are active; add admin/global monitoring and suspicious-attempt alerts |
+| `/play/unlock` | Brute force or spoiler probing | Guest-scoped rate limiting, CSRF, raw-code hashing, target checks, host activity monitoring, admin/global monitoring, and suspicious-attempt alert queueing are active |
+| `/admin/conditional-activity/alerts` | Alert spam or unauthorized operations visibility | Admin-only CSRF route queues deduped alert emails and audits the action |
 | `/host/party/[partyId]/*` | Unauthorized mutation | Ownership checks and CSRF are active; add more mutation-specific tests |
 | `/checkout/start` | Payment abuse | Rate limit, CSRF, pending orders, and Stripe checkout foundation are active |
 | `/api/webhooks/payments/stripe` | Spoofed payment events | Stripe HMAC signature verification and idempotency are active |
 | `/support` | Spam | Rate limit is active; add spam filtering later |
-| `/admin` | Sensitive data exposure | Role-specific admin permissions and audit logging are active; add super-admin role management later |
+| `/admin` | Sensitive data exposure | Role-specific admin permissions, audit logging, and super-admin user management are active |
+| `/admin/users` | Account takeover or staff over-permissioning | Super-admin-only role assignment/session revocation is active, with bootstrap only when no super admin exists and recent account-security history visible; add approval workflow later |
 
 ## Environment Variables To Document
 
@@ -120,10 +127,10 @@ This checklist captures the current security posture and the next hardening move
 
 ## Recommended Next Code Changes
 
-1. Add admin account recovery and session revocation tooling.
+1. Add admin account recovery review workflow and sensitive role-change approval policy.
 2. Expand dedicated test database coverage with more browser-level mutation tests.
 3. Add structured logging for webhook, support, auth, and admin events.
 4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
 5. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
-6. Add admin/global monitoring for code attempts and unlock events.
-7. Add super-admin-only role management before hiring support/content staff.
+6. Tune suspicious-attempt thresholds after real staging gameplay tests.
+7. Add approval policy for role changes before hiring support/content staff.

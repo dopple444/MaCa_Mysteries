@@ -1,4 +1,5 @@
 import { fulfillPaidOrder } from "./game-access";
+import { getAdminAlertRecipients, getAdminAlertUrl, getAlertDedupeCutoff } from "./admin-alerts";
 import { queueEmailMessage } from "./outbound-delivery";
 import { prisma } from "./prisma";
 import { logPaymentEvent } from "./server-logging";
@@ -81,30 +82,7 @@ function getStringField(value: unknown, field: string) {
 }
 
 export function getPaymentOperationsAlertRecipients(env: EnvMap = process.env) {
-  const raw = env.ADMIN_ALERT_EMAILS?.trim() || env.ADMIN_ALERT_EMAIL?.trim() || "";
-  if (!raw) return [];
-
-  return [
-    ...new Set(
-      raw
-        .split(/[,\n;]/)
-        .map((recipient) => recipient.trim().toLowerCase())
-        .filter((recipient) => recipient.includes("@"))
-    )
-  ];
-}
-
-function getAlertDedupeCutoff(now: Date, dedupeMinutes: number | undefined) {
-  const minutes =
-    Number.isFinite(dedupeMinutes) && dedupeMinutes && dedupeMinutes > 0
-      ? dedupeMinutes
-      : DEFAULT_PAYMENT_ALERT_DEDUPE_MINUTES;
-  return new Date(now.getTime() - minutes * 60 * 1000);
-}
-
-function getAdminAlertUrl(env: EnvMap) {
-  const baseUrl = env.APP_URL?.trim().replace(/\/$/, "") || "http://localhost:3000";
-  return `${baseUrl}/admin`;
+  return getAdminAlertRecipients(env);
 }
 
 function shouldQueuePaymentAlert(summary: {
@@ -185,7 +163,7 @@ export async function queuePaymentOperationsAlert(input: PaymentOperationsAlertI
     `Recoverable Stripe checkouts: ${summary.recoverableStripeCheckoutCount}.`,
     `Review: ${adminUrl}`
   ].join(" ");
-  const dedupeCutoff = getAlertDedupeCutoff(now, input.dedupeMinutes);
+  const dedupeCutoff = getAlertDedupeCutoff(now, input.dedupeMinutes, DEFAULT_PAYMENT_ALERT_DEDUPE_MINUTES);
   let queuedCount = 0;
   let skippedDuplicateCount = 0;
 

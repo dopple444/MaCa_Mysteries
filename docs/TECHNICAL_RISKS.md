@@ -38,13 +38,14 @@ Current risk:
 
 - Custom auth has sessions, password hashing, HTTP-only cookies, CSRF, and rate limiting.
 - It has email verification and password reset foundations.
-- It still lacks admin account recovery tooling, session revocation tooling, account lockout policy, and OAuth.
+- Sign-in success/failure/rate-limit events, logout, account creation, email verification, password reset, role changes, and session revocations are audit logged and visible to super admins.
+- It still lacks full admin account recovery review workflow, account lockout policy, and OAuth.
 
 Mitigation:
 
 - Use `docs/ACCOUNT_RECOVERY_PROCEDURES.md` as the operating baseline and add admin tooling before public launch.
-- Add session metadata and revocation tools.
-- Audit sensitive account events.
+- Add richer session metadata and keep super-admin revocation tools available for account recovery.
+- Continue auditing sensitive account events and add alerting/approval workflow for high-risk changes.
 - Consider Auth.js or another established auth library if OAuth/social login becomes important.
 
 ## Payment Integration
@@ -117,6 +118,7 @@ Current risk:
 - The foundation models and services exist for digital artifacts, character tools, unlock rules, code attempts, unlock events, asset views, player interactions, and player inventory.
 - The first player-facing access-code unlock path is implemented and tested end to end for locked evidence, cards, media, and digital artifacts.
 - Host party pages now show sanitized code-attempt and unlock-event activity without raw codes.
+- Admin inventory now shows platform-wide code-attempt and unlock-event monitoring without stored code hashes, plus deduped suspicious-attempt alert queueing.
 - Draft-only authoring screens now exist for digital artifacts, character tools, and unlock rules.
 - Admin preview pages now simulate host-safe, spoiler-host, and selected-character projections.
 - Publish-readiness validation now blocks missing essential content, orphan required unlock rules, unpublished required rules, unattached published rules, and access-code rules without generator tools.
@@ -127,7 +129,7 @@ Mitigation:
 
 - Expand publish-readiness checks for circular dependencies, impossible round/character conditions, unsafe spoiler labels, and every trigger type beyond access-code rules.
 - Add transaction-level guards around limited-use tools and repeated code attempts as gameplay traffic increases.
-- Add admin/global monitoring views for failed attempts, successful unlocks, and unusual retry patterns.
+- Tune suspicious-attempt thresholds and add unusual retry pattern reporting on top of the admin/global monitoring view.
 - Extend tests beyond access codes to asset-view, host-approval, round-state, reveal-state, and multi-player interaction rules.
 
 ## Data Model Complexity
@@ -217,11 +219,11 @@ Current state:
 Remaining risk:
 
 - Admin is still a single broad role.
-- There is no super-admin UI yet for assigning roles, reviewing role history, or revoking sessions.
+- Super-admin UI now exists for assigning roles, revoking sessions, searching/filtering accounts, and reviewing recent role/session audit history.
 
 Mitigation:
 
-- Add super-admin-only role management and session revocation tooling.
+- Add approval workflow for sensitive role changes and broader account recovery procedures.
 - Continue authorization tests for every new mutation route.
 - Keep audit logging on sensitive admin actions.
 

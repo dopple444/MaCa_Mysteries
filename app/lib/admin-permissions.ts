@@ -4,6 +4,16 @@ type UserLike = {
 
 export type AdminPermission = "overview" | "content" | "payment" | "support" | "outbound";
 
+export const USER_ROLE_OPTIONS = [
+  "HOST",
+  "PLAYER",
+  "ADMIN",
+  "SUPER_ADMIN",
+  "CONTENT_EDITOR",
+  "SUPPORT",
+  "FINANCE"
+] as const;
+
 const ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
   ADMIN: ["overview", "content", "payment", "support", "outbound"],
   SUPER_ADMIN: ["overview", "content", "payment", "support", "outbound"],
@@ -23,4 +33,8 @@ export function isOperationalAdminRole(role: string) {
 export function hasAdminPermission(user: UserLike | null | undefined, permission: AdminPermission) {
   if (!user) return false;
   return getAdminPermissions(user.role).includes(permission);
+}
+
+export function isKnownUserRole(role: string) {
+  return (USER_ROLE_OPTIONS as readonly string[]).includes(role);
 }

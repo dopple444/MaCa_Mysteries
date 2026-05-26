@@ -111,7 +111,9 @@ Key dependency versions from `package.json`:
 | --- | --- |
 | `app/lib/prisma.ts` | Creates/reuses a Prisma Client instance and stores it on `globalThis` during development. |
 | `app/lib/auth.ts` | Custom password hashing, password verification, session token creation, session clearing, current-user lookup, and auth guard. |
-| `app/lib/auth-actions.ts` | Server actions for login, signup, and logout. Uses Prisma and redirects after completion. |
+| `app/lib/auth-actions.ts` | Server actions for login, signup, and logout. Uses Prisma, rate limiting, CSRF, auth/account audit events, and redirects after completion. |
+| `app/lib/auth-audit.ts` | Auth/account audit helper for sign-in success/failure/rate-limit events, logout, and account creation metadata. |
+| `app/lib/admin-alerts.ts` | Shared admin alert recipient, admin URL, and dedupe-window helpers for operations email queues. |
 | `app/lib/account-security.ts` | Signed account-action tokens, email verification queueing, password reset queueing, and password reset fulfillment. |
 | `app/lib/account-security-actions.ts` | Server actions for verification resend, password reset request, and password reset confirmation. |
 | `app/lib/guest-auth.ts` | Guest cookie/session helpers for joined player access. |
@@ -127,8 +129,9 @@ Key dependency versions from `package.json`:
 | `app/lib/builder-preview.ts` | Admin preview projection service for host-safe, spoiler-host, and character-specific views using round progress and simulated unlock rules. |
 | `app/lib/publish-readiness.ts` | Game-version validation service used before publishing; checks required content, final reveal presence, version-owned links, required unlock rules, and access-code generator wiring. |
 | `app/lib/admin-version-status.ts` | Admin game-version status service that blocks unsafe publish attempts, updates publish timestamps, and audits status changes. |
+| `app/lib/admin-users.ts` | Super-admin account operations service for bootstrap-safe role assignment, last-super-admin protection, session revocation, account search/filtering, recent account-security event lookup, and audit logging. |
 | `app/lib/conditional-unlocks.ts` | Conditional reveal service for actor visibility checks, guest/host unlock projections, party tool code creation, access-code attempts, and unlock events. |
-| `app/lib/conditional-activity.ts` | Host-safe conditional activity projection for code attempts and unlock events. Redacts rule/tool labels unless spoiler mode is explicitly unlocked and never returns raw codes. |
+| `app/lib/conditional-activity.ts` | Host-safe and admin conditional activity projection for code attempts and unlock events. Host views redact rule/tool labels unless spoiler mode is explicitly unlocked; admin/global monitoring and alert queueing never return stored code hashes. |
 | `app/lib/player-artifacts.ts` | Player-safe digital artifact projection helper that filters artifacts by character, round state, evidence/media dependencies, and unlock events. |
 | `app/lib/player-tools.ts` | Player-facing character tool service that creates party-specific access-code tool instances, projects visible tool codes, lists locked evidence/card/media/artifact prompts, and submits code unlock attempts without storing raw codes. |
 | `app/lib/storage.ts` | Storage provider detection, media upload validation, and local public/private upload writes. |
@@ -155,7 +158,7 @@ Key dependency versions from `package.json`:
 1. `/signup` posts a server action to `signup()`.
 2. `signup()` validates fields, creates a `User` with `role: HOST`, stores `passwordHash`, creates a session, and redirects to `/dashboard`.
 3. `/login` posts to `login()`.
-4. `login()` verifies email/password, creates a session, and redirects to `/dashboard`.
+4. `login()` verifies email/password, audits success/failure/rate-limit events, creates a session, and redirects to `/dashboard` or email verification.
 5. Sessions are stored in the `UserSession` table as SHA-256 token hashes.
 6. The browser receives an HTTP-only cookie named `maca_session`.
 7. `requireUser()` redirects unauthenticated users to `/login`.
@@ -263,7 +266,7 @@ The current Prisma schema contains:
 
 `Guest` now carries both party participation status and invitation delivery state: queued/sent/failed status, last queued/sent timestamps, resend count, and last failure detail.
 
-Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, super-admin role management UI, and future marketplace entities.
+Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, role-change history display, and future marketplace entities.
 
 ## Current Architectural Assessment
 
@@ -289,6 +292,6 @@ Gaps:
 - Real payment processing needs Stripe test credentials and dashboard/webhook verification before selling games.
 - Email records can be queued, delivered through console dry-run or Resend, failed, and retried. Support replies queue customer emails and internal notes stay local. SMS records can be queued, failed, and retried, but no real SMS provider adapter is enabled yet.
 - Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
-- Auth now has email verification and password reset foundations. It still lacks support/admin recovery procedures, account lockout policy, and admin session revocation tooling.
+- Auth now has email verification, password reset, super-admin role assignment, super-admin session revocation, login/logout/account audit events, and visible account-security audit history foundations. It still lacks broader support/admin recovery procedures, sensitive role-change approval workflow, and account lockout policy.
 - Admin role values and route gates now support full admin, content editor, finance, and support scopes. Role assignment/revocation UI is still missing.
 - A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.
