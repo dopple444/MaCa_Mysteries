@@ -9,7 +9,7 @@ This document describes the safe operating procedure for account recovery before
 - Signup creates a host account, signs the user in, and queues an email verification message.
 - Email verification uses a signed link and stores `User.emailVerifiedAt`.
 - Password reset requests queue a signed one-hour reset link if the account exists.
-- Password reset changes the password, revokes existing sessions for that user, writes an audit event, and signs the user in with the new password.
+- Password reset changes the password, marks existing sessions revoked, clears login lockout state, writes an audit event, and signs the user in with the new password.
 - Reset and verification emails are queued as `OutboundMessage` records and delivered through the configured email provider.
 - Admin/support account recovery cases are tracked in `AccountRecoveryCase`.
 - `/admin/account-recovery` lets support-capable admins create cases, link support tickets, record identity review status, and queue password reset or email verification messages.
@@ -48,7 +48,7 @@ The admin account recovery view now includes:
 
 - User lookup by email.
 - Email verification status.
-- Session, order, party, and support-ticket account counts.
+- Active session metadata, order, party, and support-ticket account counts.
 - Recovery case creation and support-ticket linking.
 - Identity verification state.
 - Guarded resend verification/reset actions.
@@ -78,5 +78,5 @@ Use `/admin/users` for super-admin session revocation when a compromised session
 - Test password reset with a real inbox.
 - Confirm failed outbound messages are visible and retryable from admin.
 - Confirm `/admin/account-recovery` is visible only to support-capable admin roles.
-- Confirm super-admin session revocation remains available through `/admin/users`.
+- Confirm super-admin session revocation remains available through `/admin/users` and retains revocation metadata.
 - Run an account recovery drill with a support ticket, verified case, queued reset email, and closed case.

@@ -21,6 +21,11 @@ export default async function LoginPage({
         {params?.error === "rate-limited" && (
           <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">Too many sign-in attempts. Please wait and try again.</p>
         )}
+        {params?.error === "locked" && (
+          <p className="mt-4 rounded-2xl bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            Too many sign-in attempts. Please wait before trying again or reset your password.
+          </p>
+        )}
         {params?.verified === "1" && (
           <p className="mt-4 rounded-2xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
             Email verified. Sign in to continue.

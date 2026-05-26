@@ -24,6 +24,10 @@ model User {
   role                          UserRole                @default(HOST)
   passwordHash                  String?
   emailVerifiedAt               DateTime?
+  failedLoginCount              Int                     @default(0)
+  lastFailedLoginAt             DateTime?
+  lockedUntil                   DateTime?
+  lastLoginAt                   DateTime?
   phoneNumber                   String                  @default("")
   phoneVerifiedAt               DateTime?
   notificationPrefs             Json                    @default("{}")
@@ -49,12 +53,22 @@ model User {
 }
 
 model UserSession {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  tokenHash       String    @unique
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  ipAddress       String    @default("")
+  userAgent       String    @default("")
+  createdBy       String    @default("LOGIN")
+  lastSeenAt      DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokeReason    String    @default("")
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model Party {

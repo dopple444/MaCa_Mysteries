@@ -68,6 +68,8 @@ function getAdminUserEventTitle(action: string) {
       return "Sign-in failed";
     case "auth.login.rateLimited":
       return "Sign-in rate limited";
+    case "auth.login.locked":
+      return "Account locked";
     case "auth.logout":
       return "Signed out";
     default:
@@ -106,6 +108,15 @@ function getRoleDisplay(role: string) {
 function getRequestActorName(user: { name: string; email: string } | null) {
   if (!user) return "Unknown";
   return user.name || user.email;
+}
+
+function getSessionDeviceLabel(userAgent: string) {
+  if (!userAgent) return "Unknown device";
+  if (userAgent.includes("Firefox")) return "Firefox";
+  if (userAgent.includes("Edg/")) return "Edge";
+  if (userAgent.includes("Chrome")) return "Chrome";
+  if (userAgent.includes("Safari")) return "Safari";
+  return userAgent.slice(0, 48);
 }
 
 export default async function AdminUsersPage({
@@ -301,12 +312,37 @@ export default async function AdminUsersPage({
                   <p className="mt-1 text-sm text-slate-400">{account.email}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-slate-300">
                     <span className="rounded-full bg-slate-800 px-3 py-1">{getUserRoleLabel(account.role)}</span>
-                    <span className="rounded-full bg-slate-800 px-3 py-1">{account._count.sessions} sessions</span>
+                    <span className="rounded-full bg-slate-800 px-3 py-1">{account.sessions.length} active sessions</span>
                     <span className="rounded-full bg-slate-800 px-3 py-1">{account._count.parties} parties</span>
                     <span className="rounded-full bg-slate-800 px-3 py-1">{account._count.orders} orders</span>
                     <span className="rounded-full bg-slate-800 px-3 py-1">
                       {account.emailVerifiedAt ? "Verified" : "Unverified"}
                     </span>
+                    {account.lockedUntil && account.lockedUntil > new Date() && (
+                      <span className="rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-100">Locked</span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-400">
+                    {account.lastLoginAt && <p>Last sign-in: {formatActivityTime(account.lastLoginAt)}</p>}
+                    {account.lastFailedLoginAt && (
+                      <p>
+                        Failed attempts: {account.failedLoginCount}
+                        {account.lockedUntil && account.lockedUntil > new Date()
+                          ? `, locked until ${formatActivityTime(account.lockedUntil)}`
+                          : ""}
+                      </p>
+                    )}
+                    {account.sessions.length ? (
+                      account.sessions.map((session) => (
+                        <p key={session.id}>
+                          Active {session.createdBy.toLowerCase().replaceAll("_", " ")} session:{" "}
+                          {formatActivityTime(session.lastSeenAt)} from {session.ipAddress || "unknown IP"} via{" "}
+                          {getSessionDeviceLabel(session.userAgent)}
+                        </p>
+                      ))
+                    ) : (
+                      <p>No active sessions.</p>
+                    )}
                   </div>
                   <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">
                     Updated {formatActivityTime(account.updatedAt)}

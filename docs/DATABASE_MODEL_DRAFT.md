@@ -44,13 +44,17 @@ Suggested fields:
 - `last_name`
 - `role`
 - `password_hash`
+- `failed_login_count`
+- `last_failed_login_at`
+- `locked_until`
+- `last_login_at`
 - `status`
 - `created_at`
 - `updated_at`
 
 Notes:
 
-- Current schema has `User.id`, `email`, `emailVerifiedAt`, `name`, `role`, `passwordHash`, phone/preference fields, and timestamps.
+- Current schema has `User.id`, `email`, `emailVerifiedAt`, `name`, `role`, `passwordHash`, login lockout fields, last-login timestamp, phone/preference fields, and timestamps.
 - Current `UserRole` values are `HOST`, `PLAYER`, `ADMIN`, `SUPER_ADMIN`, `CONTENT_EDITOR`, `SUPPORT`, and `FINANCE`.
 - Add user status before production.
 
@@ -85,13 +89,18 @@ Suggested fields:
 - `token_hash`
 - `ip_address`
 - `user_agent`
+- `created_by`
+- `last_seen_at`
 - `expires_at`
 - `revoked_at`
+- `revoked_by_user_id`
+- `revoke_reason`
 - `created_at`
 
 Notes:
 
-- Current schema has `UserSession`.
+- Current schema has `UserSession` with active/revoked session metadata.
+- Logout, password reset, and super-admin revocation mark sessions revoked instead of deleting them so account recovery and security review keep useful context.
 - Consider renaming/mapping to `sessions` or keeping `user_sessions`.
 
 ### admin_action_requests

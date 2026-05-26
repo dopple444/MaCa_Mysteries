@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getNextFailedLoginCount,
+  isAccountLocked,
+  recordFailedLogin,
+  recordSuccessfulLogin
+} from "../app/lib/account-lockout";
+import {
   createAccountActionToken,
   queueEmailVerificationMessage,
   queuePasswordResetMessage,
@@ -92,12 +98,38 @@ test("password reset tokens queue email and become invalid after password reset"
       purpose: "password-reset",
       expiresInMinutes: 10
     });
+    await prisma.user.update({
+      where: { id: fixture.user.id },
+      data: {
+        failedLoginCount: 5,
+        lastFailedLoginAt: new Date(),
+        lockedUntil: new Date(Date.now() + 15 * 60 * 1000)
+      }
+    });
+    await prisma.userSession.create({
+      data: {
+        userId: fixture.user.id,
+        tokenHash: `${fixture.label}-reset-session`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      }
+    });
+
     const result = await resetUserPasswordWithToken(token, "new-password-456");
     assert.equal(result.reset, true);
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: fixture.user.id } });
     assert.ok(user.passwordHash);
     assert.equal(verifyPassword("new-password-456", user.passwordHash), true);
+    assert.equal(user.failedLoginCount, 0);
+    assert.equal(user.lockedUntil, null);
+
+    const resetRevokedSession = await prisma.userSession.findFirstOrThrow({
+      where: {
+        userId: fixture.user.id,
+        revokeReason: "PASSWORD_RESET"
+      }
+    });
+    assert.ok(resetRevokedSession.revokedAt);
 
     const reused = await verifyAccountActionToken(token, "password-reset");
     assert.equal(reused, null);
@@ -107,6 +139,43 @@ test("password reset tokens queue email and become invalid after password reset"
     } else {
       process.env.APP_URL = previousAppUrl;
     }
+    await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
+  }
+});
+
+test("account lockout tracks consecutive failures and clears after success", async () => {
+  const fixture = await createAccountSecurityFixture("account-security-lockout");
+  const now = new Date();
+
+  try {
+    assert.equal(getNextFailedLoginCount({ failedLoginCount: 2, lastFailedLoginAt: now }, now), 3);
+    assert.equal(
+      getNextFailedLoginCount({
+        failedLoginCount: 2,
+        lastFailedLoginAt: new Date(now.getTime() - 20 * 60 * 1000)
+      }),
+      1
+    );
+
+    let user = await prisma.user.findUniqueOrThrow({ where: { id: fixture.user.id } });
+    assert.equal(isAccountLocked(user, now), false);
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const state = await recordFailedLogin(user, now);
+      user = await prisma.user.findUniqueOrThrow({ where: { id: fixture.user.id } });
+      assert.equal(state.failedLoginCount, attempt);
+    }
+
+    assert.equal(user.failedLoginCount, 5);
+    assert.ok(user.lockedUntil);
+    assert.equal(isAccountLocked(user, now), true);
+
+    await recordSuccessfulLogin(user.id, now);
+    user = await prisma.user.findUniqueOrThrow({ where: { id: fixture.user.id } });
+    assert.equal(user.failedLoginCount, 0);
+    assert.equal(user.lockedUntil, null);
+    assert.ok(user.lastLoginAt);
+  } finally {
     await deleteCommerceFixture(fixture.slug, fixture.emailDomain);
   }
 });

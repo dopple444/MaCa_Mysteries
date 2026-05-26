@@ -1,13 +1,20 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { prisma } from "./prisma";
 
 const SESSION_COOKIE = "maca_session";
 const SESSION_DAYS = 14;
+const LAST_SEEN_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 
 type UserRole = "HOST" | "PLAYER" | "ADMIN" | "SUPER_ADMIN" | "CONTENT_EDITOR" | "SUPPORT" | "FINANCE";
+
+type CreateSessionMetadata = {
+  ipAddress?: string;
+  userAgent?: string;
+  createdBy?: string;
+};
 
 function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -26,7 +33,23 @@ export function verifyPassword(password: string, storedHash: string) {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), derived);
 }
 
-export async function createSession(userId: string) {
+function normalizeSessionText(value: string | null | undefined, maxLength: number) {
+  return (value ?? "").trim().slice(0, maxLength);
+}
+
+export async function getRequestSessionMetadata(createdBy = "LOGIN"): Promise<CreateSessionMetadata> {
+  const headerStore = await headers();
+  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0];
+  const realIp = headerStore.get("x-real-ip");
+
+  return {
+    ipAddress: normalizeSessionText(forwardedFor || realIp, 100),
+    userAgent: normalizeSessionText(headerStore.get("user-agent"), 500),
+    createdBy: normalizeSessionText(createdBy, 50)
+  };
+}
+
+export async function createSession(userId: string, metadata: CreateSessionMetadata = {}) {
   const token = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -34,6 +57,9 @@ export async function createSession(userId: string) {
     data: {
       userId,
       tokenHash: hashToken(token),
+      ipAddress: normalizeSessionText(metadata.ipAddress, 100),
+      userAgent: normalizeSessionText(metadata.userAgent, 500),
+      createdBy: normalizeSessionText(metadata.createdBy || "LOGIN", 50),
       expiresAt
     }
   });
@@ -52,7 +78,13 @@ export async function clearSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (token) {
-    await prisma.userSession.deleteMany({ where: { tokenHash: hashToken(token) } });
+    await prisma.userSession.updateMany({
+      where: { tokenHash: hashToken(token), revokedAt: null },
+      data: {
+        revokedAt: new Date(),
+        revokeReason: "LOGOUT"
+      }
+    });
   }
   cookieStore.delete(SESSION_COOKIE);
 }
@@ -67,9 +99,25 @@ export async function getCurrentUser() {
     include: { user: true }
   });
 
-  if (!session || session.expiresAt <= new Date() || session.user === null) {
-    if (session) await prisma.userSession.delete({ where: { id: session.id } });
+  const now = new Date();
+  if (!session || session.revokedAt || session.expiresAt <= now || session.user === null) {
+    if (session && !session.revokedAt && session.expiresAt <= now) {
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: {
+          revokedAt: now,
+          revokeReason: "EXPIRED"
+        }
+      });
+    }
     return null;
+  }
+
+  if (now.getTime() - session.lastSeenAt.getTime() > LAST_SEEN_WRITE_INTERVAL_MS) {
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: { lastSeenAt: now }
+    });
   }
 
   return session.user;

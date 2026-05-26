@@ -36,17 +36,17 @@ Mitigation:
 
 Current risk:
 
-- Custom auth has sessions, password hashing, HTTP-only cookies, CSRF, and rate limiting.
+- Custom auth has session metadata, password hashing, HTTP-only cookies, CSRF, rate limiting, and consecutive-failure account lockout.
 - It has email verification and password reset foundations.
 - Sign-in success/failure/rate-limit events, logout, account creation, email verification, password reset, role-change requests/approvals/denials, session revocations, and account recovery actions are audit logged and visible to the appropriate admin scopes.
 - Support-gated account recovery cases now exist for ticket-linked identity review and safe reset/verification email queueing.
-- It still lacks account lockout policy, richer session metadata, and OAuth.
+- It still lacks OAuth, session rotation policy, and deeper risk scoring/alerting.
 
 Mitigation:
 
 - Use `docs/ACCOUNT_RECOVERY_PROCEDURES.md` as the operating baseline and run a recovery drill before public launch.
-- Add richer session metadata and keep super-admin revocation tools available for account recovery.
-- Continue auditing sensitive account events and add alerting for high-risk login/recovery patterns.
+- Keep super-admin revocation tools and session metadata available for account recovery.
+- Continue auditing sensitive account events and add risk-scored alerting for high-risk login/recovery patterns.
 - Consider Auth.js or another established auth library if OAuth/social login becomes important.
 
 ## Payment Integration
@@ -220,11 +220,11 @@ Current state:
 Remaining risk:
 
 - Super-admin UI now exists for requesting/approving sensitive role changes, revoking sessions, searching/filtering accounts, and reviewing recent role/session audit history.
-- Support-gated account recovery exists, but session metadata and lockout policy are still shallow.
+- Support-gated account recovery, session metadata, and consecutive-failure lockout exist, but risk-scored alerts and session rotation are still shallow.
 
 Mitigation:
 
-- Add broader login/security event monitoring, lockout rules, and session metadata.
+- Add broader login/security event monitoring, risk-scored alerts, and session rotation rules.
 - Continue authorization tests for every new mutation route.
 - Keep audit logging on sensitive admin actions.
 

@@ -159,8 +159,8 @@ Key dependency versions from `package.json`:
 1. `/signup` posts a server action to `signup()`.
 2. `signup()` validates fields, creates a `User` with `role: HOST`, stores `passwordHash`, creates a session, and redirects to `/dashboard`.
 3. `/login` posts to `login()`.
-4. `login()` verifies email/password, audits success/failure/rate-limit events, creates a session, and redirects to `/dashboard` or email verification.
-5. Sessions are stored in the `UserSession` table as SHA-256 token hashes.
+4. `login()` verifies email/password, enforces rate limits and the consecutive-failure account lockout policy, audits success/failure/rate-limit/lockout events, creates a session, and redirects to `/dashboard` or email verification.
+5. Sessions are stored in the `UserSession` table as SHA-256 token hashes with IP address, user-agent, created-by, last-seen, expiration, and revocation metadata.
 6. The browser receives an HTTP-only cookie named `maca_session`.
 7. `requireUser()` redirects unauthenticated users to `/login`.
 
@@ -269,7 +269,7 @@ The current Prisma schema contains:
 
 `Guest` now carries both party participation status and invitation delivery state: queued/sent/failed status, last queued/sent timestamps, resend count, and last failure detail.
 
-Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, richer account recovery/session metadata, and future marketplace entities.
+Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, account recovery drill/reporting polish, and future marketplace entities.
 
 ## Current Architectural Assessment
 
@@ -295,6 +295,6 @@ Gaps:
 - Real payment processing needs Stripe test credentials and dashboard/webhook verification before selling games.
 - Email records can be queued, delivered through console dry-run or Resend, failed, and retried. Support replies queue customer emails and internal notes stay local. SMS records can be queued, failed, and retried, but no real SMS provider adapter is enabled yet.
 - Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
-- Auth now has email verification, password reset, super-admin role assignment, sensitive role-change approval requests, super-admin session revocation, support/admin recovery case tooling, login/logout/account audit events, and visible account-security audit history foundations. It still lacks account lockout policy and richer session metadata.
+- Auth now has email verification, password reset, consecutive-failure account lockout, session metadata/revocation records, super-admin role assignment, sensitive role-change approval requests, super-admin session revocation, support/admin recovery case tooling, login/logout/account audit events, and visible account-security audit history foundations. It still lacks OAuth and deeper risk scoring.
 - Admin role values and route gates now support full admin, content editor, finance, and support scopes.
 - A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.

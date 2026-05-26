@@ -85,6 +85,8 @@ function getAuditLabel(action: string) {
       return "Sign-in failed";
     case "auth.login.rateLimited":
       return "Sign-in rate limited";
+    case "auth.login.locked":
+      return "Account locked";
     case "auth.logout":
       return "Signed out";
     case "conditional.unlocks.alertQueued":

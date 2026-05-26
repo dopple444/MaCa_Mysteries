@@ -42,6 +42,7 @@ export const ADMIN_USER_AUDIT_ACTIONS = [
   "auth.login.success",
   "auth.login.failed",
   "auth.login.rateLimited",
+  "auth.login.locked",
   "auth.logout",
   "admin.actionRequest.created",
   "admin.actionRequest.approved",
@@ -111,6 +112,14 @@ export async function getManagedUsers({ query, role, take = 200 }: ManagedUserLi
     orderBy: [{ role: "asc" }, { email: "asc" }],
     take,
     include: {
+      sessions: {
+        where: {
+          revokedAt: null,
+          expiresAt: { gt: new Date() }
+        },
+        orderBy: { lastSeenAt: "desc" },
+        take: 3
+      },
       _count: {
         select: {
           sessions: true,
@@ -413,8 +422,16 @@ export async function revokeManagedUserSessions(input: RevokeUserSessionsInput) 
 
   if (!target) return { status: "NOT_FOUND" as const };
 
-  const result = await prisma.userSession.deleteMany({
-    where: { userId: target.id }
+  const result = await prisma.userSession.updateMany({
+    where: {
+      userId: target.id,
+      revokedAt: null
+    },
+    data: {
+      revokedAt: new Date(),
+      revokedByUserId: input.actor.id,
+      revokeReason: "ADMIN_REVOKE"
+    }
   });
 
   await logAuditEvent({

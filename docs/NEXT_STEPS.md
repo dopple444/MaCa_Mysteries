@@ -42,6 +42,8 @@ Last inspected: 2026-05-22
 - Outbound email/SMS provider helpers, queued email creation, console/Resend email delivery, sent/failed markers, and retry controls exist.
 - Account email verification and password reset flows use signed links and queued email messages.
 - Support-gated account recovery cases exist for ticket-linked identity review, safe reset/verification email queueing, and recovery audit history.
+- User sessions now retain IP address, user-agent, created-by, last-seen, expiration, and revocation metadata.
+- Login now tracks consecutive failed attempts and temporarily locks accounts after repeated failures.
 - SMS preference model and account notification settings screen exist; real SMS sending remains disabled until a provider is chosen.
 - Support ticket intake stores requests in Postgres.
 - Audit log foundation covers host, player, admin content, support, invite, party status, and outbound retry mutations.
@@ -105,7 +107,8 @@ Last inspected: 2026-05-22
    - Password reset revokes existing sessions and signs the user in with the new password.
    - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
    - `/admin/account-recovery` lets support-capable admins create recovery cases, link matching support tickets, mark identity verification state, queue password reset/email verification messages, and close cases without exposing signed recovery links.
-   - Next: add richer session metadata, lockout/risk policy, and recovery drill reporting before production launch.
+   - Session metadata and the first account lockout policy are implemented.
+   - Next: add recovery drill reporting, session rotation after sensitive changes, and deeper risk scoring before production launch.
 
 8. Choose and implement the SMS provider.
    - Pick Twilio or another provider.
@@ -179,7 +182,8 @@ Last inspected: 2026-05-22
    - Sensitive operational role changes now create `AdminActionRequest` approval records before the target user role changes.
    - Role-change requests, approvals, denials, session revocations, account creation, sign-in success/failure/rate-limit events, logout, email verification, and password reset events are audit logged and visible in the recent account-security trail.
    - Account recovery case actions are audit logged and included in the account-security trail.
-   - Next: add broader login/security event monitoring, session metadata, and account lockout policy.
+   - Active session metadata, failed-attempt counts, account lock status, and recent session context are visible in `/admin/users`.
+   - Next: add broader login/security event monitoring, session rotation policy, and risk-scored alerts.
 
 18. Prepare production process, network layer, and security gates.
    - Status: in progress.

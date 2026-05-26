@@ -173,10 +173,22 @@ export async function resetUserPasswordWithToken(token: string, password: string
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash }
+      data: {
+        passwordHash,
+        failedLoginCount: 0,
+        lastFailedLoginAt: null,
+        lockedUntil: null
+      }
     }),
-    prisma.userSession.deleteMany({
-      where: { userId: user.id }
+    prisma.userSession.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: new Date(),
+        revokeReason: "PASSWORD_RESET"
+      }
     })
   ]);
   await logAuditEvent({

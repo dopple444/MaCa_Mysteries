@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { createSession, getCurrentUser } from "./auth";
+import { createSession, getCurrentUser, getRequestSessionMetadata } from "./auth";
 import { verifyCsrfToken } from "./csrf";
 import {
   queueEmailVerificationMessage,
@@ -78,6 +78,6 @@ export async function resetPassword(formData: FormData) {
     redirect("/forgot-password?reset=invalid");
   }
 
-  await createSession(result.userId);
+  await createSession(result.userId, await getRequestSessionMetadata("PASSWORD_RESET"));
   redirect("/dashboard?password=reset");
 }

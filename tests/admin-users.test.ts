@@ -179,6 +179,17 @@ test("getManagedUsers filters accounts by role and search text", async () => {
         select: { id: true }
       })).id
     });
+    await prisma.userSession.create({
+      data: {
+        userId: fixture.target.id,
+        tokenHash: `${fixture.label}-active-session`,
+        ipAddress: "203.0.113.20",
+        userAgent: "Unit Test Browser",
+        createdBy: "LOGIN",
+        lastSeenAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+      }
+    });
 
     const matchingUsers = await getManagedUsers({
       query: "target",
@@ -187,6 +198,9 @@ test("getManagedUsers filters accounts by role and search text", async () => {
 
     assert.ok(matchingUsers.some((user) => user.id === fixture.target.id));
     assert.ok(matchingUsers.every((user) => user.role === "SUPPORT"));
+    const targetUser = matchingUsers.find((user) => user.id === fixture.target.id);
+    assert.equal(targetUser?.sessions.length, 1);
+    assert.equal(targetUser?.sessions[0]?.ipAddress, "203.0.113.20");
 
     const nonMatchingUsers = await getManagedUsers({
       query: "target",
@@ -232,7 +246,7 @@ test("updateManagedUserRole protects the last super admin", async () => {
   }
 });
 
-test("revokeManagedUserSessions deletes target sessions and audits the action", async () => {
+test("revokeManagedUserSessions revokes target sessions and audits the action", async () => {
   const fixture = await createAdminUsersFixture("admin-users-sessions");
 
   try {
@@ -258,7 +272,18 @@ test("revokeManagedUserSessions deletes target sessions and audits the action", 
 
     assert.equal(result.status, "REVOKED");
     assert.equal(result.revokedSessionCount, 2);
-    assert.equal(await prisma.userSession.count({ where: { userId: fixture.target.id } }), 0);
+    assert.equal(await prisma.userSession.count({ where: { userId: fixture.target.id, revokedAt: null } }), 0);
+    assert.equal(
+      await prisma.userSession.count({
+        where: {
+          userId: fixture.target.id,
+          revokedAt: { not: null },
+          revokedByUserId: fixture.superAdmin.id,
+          revokeReason: "ADMIN_REVOKE"
+        }
+      }),
+      2
+    );
 
     const audit = await prisma.auditLog.findFirst({
       where: {

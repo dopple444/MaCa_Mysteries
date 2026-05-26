@@ -3,8 +3,16 @@
 import { redirect } from "next/navigation";
 
 import { queueEmailVerificationMessage } from "./account-security";
-import { createSession, clearSession, getCurrentUser, hashPassword, verifyPassword } from "./auth";
+import {
+  createSession,
+  clearSession,
+  getCurrentUser,
+  getRequestSessionMetadata,
+  hashPassword,
+  verifyPassword
+} from "./auth";
 import { logAuthAuditEvent } from "./auth-audit";
+import { isAccountLocked, recordFailedLogin, recordSuccessfulLogin } from "./account-lockout";
 import { getPostLoginRedirectPath } from "./auth-flow";
 import { verifyCsrfToken } from "./csrf";
 import { prisma } from "./prisma";
@@ -40,22 +48,46 @@ export async function login(formData: FormData) {
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
+  if (user && isAccountLocked(user)) {
+    await logAuthAuditEvent({
+      action: "auth.login.locked",
+      userId: user.id,
+      email,
+      reason: "account_locked",
+      metadata: {
+        lockedUntil: user.lockedUntil?.toISOString() ?? ""
+      }
+    });
+    redirect("/login?error=locked");
+  }
+
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+    const failedState = user ? await recordFailedLogin(user) : null;
     await logAuthAuditEvent({
       action: "auth.login.failed",
       userId: user?.id,
       email,
-      reason: "invalid_credentials"
+      reason: failedState?.locked ? "account_locked_after_failures" : "invalid_credentials",
+      metadata: {
+        failedLoginCount: failedState?.failedLoginCount ?? 0,
+        lockedUntil: failedState?.lockedUntil?.toISOString() ?? ""
+      }
     });
-    redirect("/login?error=invalid");
+    redirect(failedState?.locked ? "/login?error=locked" : "/login?error=invalid");
   }
 
-  await createSession(user.id);
+  const sessionMetadata = await getRequestSessionMetadata("LOGIN");
+  await createSession(user.id, sessionMetadata);
+  await recordSuccessfulLogin(user.id);
   await logAuthAuditEvent({
     action: "auth.login.success",
     userId: user.id,
     email: user.email,
-    reason: user.emailVerifiedAt ? "verified" : "email_verification_required"
+    reason: user.emailVerifiedAt ? "verified" : "email_verification_required",
+    metadata: {
+      ipAddress: sessionMetadata.ipAddress ?? "",
+      userAgent: sessionMetadata.userAgent ?? ""
+    }
   });
   const destination = getPostLoginRedirectPath(user);
   if (!user.emailVerifiedAt) {
@@ -100,7 +132,7 @@ export async function signup(formData: FormData) {
     }
   });
 
-  await createSession(user.id);
+  await createSession(user.id, await getRequestSessionMetadata("SIGNUP"));
   await logAuthAuditEvent({ action: "account.created", userId: user.id, email: user.email });
   redirect("/dashboard");
 }
