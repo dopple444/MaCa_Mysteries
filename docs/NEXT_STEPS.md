@@ -59,7 +59,7 @@ Last inspected: 2026-05-22
 - Automated tests cover invite parsing, invitation delivery state, card/evidence/media visibility, access control, guest cookie behavior, assignment, round progression, evidence/final reveal, accusations, purchase gating, order fulfillment, rate limiting, support replies/internal notes, storage validation/local upload writes, outbound delivery, payment checkout, Stripe webhook handling, admin character/round/card/evidence/media/builder editing, builder previews, and publish readiness.
 - Conditional reveal tests cover role-safe visibility, cross-player access-code unlocks that reveal locked content only to the intended player, player tool panel/code-entry behavior, admin validation for builder-authored tools/rules/artifacts, preview-as-host/character behavior, and publish blocking for unsafe unlock wiring.
 
-## Next 20 Development Steps
+## Next Development Steps
 
 1. Keep Git healthy.
    - Status: implemented save point.
@@ -211,6 +211,8 @@ Last inspected: 2026-05-22
 
 20. Keep marketplace work behind the first-party MVP.
    - Preserve creator profile, publishing approval, revenue split, payout, and review plans.
+   - The Mystery Party Theme Builder should remain inside the MaCa Mysteries app as the canonical builder/runtime.
+   - Future AI authoring tools should feed the app through a structured Game Package import into draft game versions.
    - Do not build creator selling flows until first-party purchase, hosting, play, support, operations, the internal Game Builder, and the Conditional Reveal Engine are stable.
 
 21. Build the internal Game Builder Wizard and Conditional Reveal Engine.
@@ -225,4 +227,11 @@ Last inspected: 2026-05-22
    - Builder editor services validate draft locks, duplicate keys, version-owned linkages, player-private character requirements, valid rule targets, and access-code source tools.
    - Builder preview pages simulate host-safe, spoiler-host, and character-specific visibility with round progress and selected unlock rules.
    - Publishing now checks required content, final reveal presence, version-owned linkages, orphan required unlocks, unpublished required rules, unattached published rules, and access-code generator requirements.
-   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, and deeper readiness checks for circular dependencies and spoiler wording.
+   - Next implementation step: extend conditional reveals into asset-view rules, host-approval rules, reveal-state rules, multi-player interaction rules, threshold tuning/reporting, deeper readiness checks for circular dependencies and spoiler wording, and a Game Package import schema for AI-assisted drafts.
+
+22. Add a certified creator dashboard after the internal builder is stable.
+   - Future `/creator` routes should be hidden unless the signed-in user has a certified/approved creator profile.
+   - Certified creators should use the same builder/versioning/preview/publish-readiness foundation as Burnett Games admins, scoped to games they own.
+   - Creator drafts may be hand-authored or imported from external AI tools through the Game Package pipeline.
+   - Creator submissions require admin review and publishing approval before any marketplace sale.
+   - Payouts, revenue splits, public creator storefronts, and reviews remain later marketplace work.

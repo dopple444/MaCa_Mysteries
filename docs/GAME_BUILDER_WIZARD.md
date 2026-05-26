@@ -8,6 +8,14 @@ The Game Builder Wizard is the planned internal content-authoring system for Bur
 
 The Conditional Reveal Engine is the runtime rules layer that decides when cards, evidence, media, digital artifacts, and character tools become available to a host or player.
 
+## Architecture Decision
+
+The Mystery Party Theme Builder should remain part of the main MaCa Mysteries app, not a separate permanent product with its own source of truth. The app should stay responsible for game versions, content validation, spoiler rules, conditional reveal rules, publishing, previews, hosting, player visibility, purchases, support, and audit logs.
+
+External AI tools can still be used later as optional authoring assistants. They should produce a structured Game Package import, not publish directly to live game data. Imported content should land in a draft `GameVersion`, then pass the same admin/creator preview and publish-readiness checks as manually authored content.
+
+This gives us one canonical builder/runtime while leaving room for stronger AI workflows outside the app.
+
 ## Current Foundation
 
 Implemented foundation:
@@ -42,6 +50,41 @@ The wizard should eventually walk an admin through:
 11. Validation checklist.
 12. Draft, publish, archive, and version control.
 
+## AI-Assisted Game Package Import
+
+Future AI tools should integrate through a reviewable package format rather than direct database writes.
+
+The package should include:
+
+- Synopsis, theme, setting, player count, duration, and content warnings.
+- Required and optional characters.
+- Public bios, private backgrounds, relationships, motives, secrets, and objectives.
+- Pre-game tasks, round cards, clues, evidence, media placeholders, fake emails/texts/documents, and investigation sheets.
+- Final reveal content, victim/killer timing rules, spoiler rules, conditional unlock rules, character tools, and validation notes.
+
+Import rules:
+
+- Create or update only draft content.
+- Never publish automatically.
+- Preserve source metadata so admins can tell whether content was hand-authored, imported, or AI-assisted.
+- Run publish-readiness validation after import.
+- Require human review for spoilers, quality, safety, IP/copyright concerns, and gameplay consistency.
+
+## Certified Creator Dashboard
+
+Creator access should be a permission layer over this same builder, not a separate builder system.
+
+Future `/creator` routes should be visible only to authenticated users with a certified/approved creator profile. Certified creators should be able to:
+
+- View their creator dashboard and game drafts.
+- Create/import draft games using the same Game Package/import path.
+- Use the same builder surfaces scoped to games they own.
+- Preview as host/player before submission.
+- Submit game versions for admin approval.
+- Receive approval feedback and revise drafts.
+
+Creators should not get payout, marketplace selling, or public storefront controls until the first-party MVP, internal builder, conditional reveal engine, support process, and production operations are stable.
+
 ## Conditional Mechanics
 
 The engine should support:
@@ -74,4 +117,5 @@ The engine should support:
 2. Expand publish-readiness checks to cover spoiler wording, circular dependencies, asset-view rules, host-approval rules, reveal-state rules, and multi-player interaction rules.
 3. Add runtime support for asset-view, host-approval, reveal-state, and multi-player interaction rules.
 4. Add object storage and signed private media URLs before production private media.
-5. Add creator permissions only after the first-party builder is stable.
+5. Define the Game Package import schema and importer for AI-assisted drafts.
+6. Add certified creator dashboard permissions only after the first-party builder is stable.

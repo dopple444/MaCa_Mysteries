@@ -875,7 +875,7 @@ These should be designed later and not included in the first MVP implementation 
 
 Later.
 
-Stores creator seller identity, bio, payout status, and marketplace settings.
+Stores creator identity, certification status, seller bio, payout status, and marketplace settings. Creator dashboard access should require a certified/approved creator profile, not just a user role.
 
 Suggested fields:
 
@@ -884,6 +884,9 @@ Suggested fields:
 - `display_name`
 - `bio`
 - `status`
+- `certification_status`
+- `certified_at`
+- `certified_by_user_id`
 - `payout_provider_account_id`
 - `created_at`
 - `updated_at`

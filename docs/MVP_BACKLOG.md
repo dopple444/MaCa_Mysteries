@@ -6,6 +6,8 @@ Last inspected: 2026-05-21
 
 Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murder mystery games. The creator marketplace should remain later-stage architecture until the first-party purchase, hosting, player, and spoiler-safe game loop is solid.
 
+The Mystery Party Theme Builder should live inside the MaCa Mysteries app as the canonical content builder and runtime. Optional external AI tools can assist story creation later by exporting a structured Game Package that imports into draft versions for human review.
+
 ## Must Have
 
 ### Public Visitor
@@ -129,7 +131,9 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 ### Future Creator
 
 - As a creator, I can apply for a creator profile so I can submit games.
-- As a creator, I can draft a game in the builder so I can build a mystery without coding.
+- As a certified creator, I can access a creator dashboard that uncertified users cannot see.
+- As a certified creator, I can draft a game in the same builder foundation so I can build a mystery without coding.
+- As a certified creator, I can import an AI-assisted Game Package into a draft so I can use outside story tools without bypassing platform validation.
 - As a creator, I can submit a game for approval so it can be reviewed before sale.
 - As a creator, I can see approval feedback so I can revise my submission.
 - As a creator, I can track sales and payouts so I understand revenue.
@@ -164,4 +168,6 @@ Recommended first implementation order:
 11. Conditional unlock/code-entry player UI.
 12. Deeper publish-readiness checks for non-code conditional rule types.
 13. Final reveal editor.
-14. Creator marketplace only after the internal builder and conditional engine are stable.
+14. Game Package import for AI-assisted draft creation.
+15. Certified creator dashboard only after the internal builder and conditional engine are stable.
+16. Creator marketplace selling only after certified creator workflows, approvals, support, and operations are stable.

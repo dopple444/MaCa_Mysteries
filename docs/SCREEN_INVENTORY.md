@@ -89,8 +89,8 @@ The app is a Next.js App Router application with public catalog pages, host/cust
 | Proposed route | Purpose | User type | Likely backend data needed | Priority |
 | --- | --- | --- | --- | --- |
 | Support SLA/status history automation | Later support operations. | Admin/support | Support messages, status-change timestamps, assignments | Could have |
-| `/creator` | Creator portal landing. | Creator | Creator profile, creator games, approvals, payouts | Later |
-| `/creator/games` | Creator game management. | Creator | Creator games, drafts, publishing approvals | Later |
+| `/creator` | Certified creator dashboard for approved creators only; should remain hidden from uncertified users. | Certified creator | Creator profile certification status, creator-owned games, drafts, approval status, scoped builder links | Later |
+| `/creator/games` | Certified creator game management using the same builder/versioning foundation as internal admins, scoped to creator-owned drafts. | Certified creator | Creator profile certification status, creator games, drafts, Game Package imports, publishing approvals | Later |
 
 ## Data Access Notes
 
