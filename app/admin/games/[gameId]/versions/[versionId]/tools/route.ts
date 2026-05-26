@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { hasAdminPermission } from "../../../../../../lib/admin-permissions";
+import { createAppUrl } from "../../../../../../lib/app-url";
 import { upsertGameCharacterTool } from "../../../../../../lib/admin-builder";
 import { logAuditEvent } from "../../../../../../lib/audit-log";
 import { getCurrentUser } from "../../../../../../lib/auth";
@@ -28,7 +30,7 @@ function getJsonObjectFormValue(formData: FormData, key: string) {
 }
 
 function redirectToGame(request: Request, gameId: string, error?: string) {
-  const url = new URL(`/admin/games/${gameId}`, request.url);
+  const url = createAppUrl(`/admin/games/${gameId}`, request.url);
   if (error) url.searchParams.set("error", error);
   return NextResponse.redirect(url, 303);
 }
@@ -54,10 +56,10 @@ export async function POST(
 ) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  if (!hasAdminPermission(user, "content")) {
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
 
   const { gameId, versionId } = await params;

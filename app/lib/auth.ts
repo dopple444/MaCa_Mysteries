@@ -7,7 +7,7 @@ import { prisma } from "./prisma";
 const SESSION_COOKIE = "maca_session";
 const SESSION_DAYS = 14;
 
-type UserRole = "HOST" | "PLAYER" | "ADMIN";
+type UserRole = "HOST" | "PLAYER" | "ADMIN" | "SUPER_ADMIN" | "CONTENT_EDITOR" | "SUPPORT" | "FINANCE";
 
 function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -83,8 +83,16 @@ export async function requireUser() {
 
 export function getUserRoleLabel(role: UserRole) {
   switch (role) {
+    case "SUPER_ADMIN":
+      return "Super administrator";
     case "ADMIN":
       return "Administrator";
+    case "CONTENT_EDITOR":
+      return "Content editor";
+    case "SUPPORT":
+      return "Support";
+    case "FINANCE":
+      return "Finance";
     case "PLAYER":
       return "Player";
     default:

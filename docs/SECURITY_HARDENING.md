@@ -8,7 +8,7 @@ This checklist captures the current security posture and the next hardening move
 
 - Host pages require an authenticated user session.
 - Party mutation routes check host ownership before writing data.
-- `/admin` requires `ADMIN` role and returns 404 for non-admin users.
+- `/admin` requires an operational admin role and returns 404 for normal hosts/players.
 - Guest play access uses guest tokens and redirects invalid cookies instead of mutating cookies during render.
 - Player card, evidence, media, accusation, victim reveal, and final reveal content are filtered through server-side visibility rules.
 - Conditional reveal checks hide cards/evidence/media that require unlock rules until the current player has an authorized unlock event.
@@ -78,7 +78,8 @@ This checklist captures the current security posture and the next hardening move
 
 10. Admin scope.
    - Admin pages expose spoiler content and platform activity.
-   - Add separate admin roles later: support, content editor, finance, super admin.
+   - Separate admin roles now exist for support, content editor, finance, and super admin.
+   - Admin pages and mutation routes are gated by content, payment, support, and outbound-message permissions.
    - Add status history automation for support as volume grows.
 
 11. Abuse prevention.
@@ -99,7 +100,7 @@ This checklist captures the current security posture and the next hardening move
 | `/checkout/start` | Payment abuse | Rate limit, CSRF, pending orders, and Stripe checkout foundation are active |
 | `/api/webhooks/payments/stripe` | Spoofed payment events | Stripe HMAC signature verification and idempotency are active |
 | `/support` | Spam | Rate limit is active; add spam filtering later |
-| `/admin` | Sensitive data exposure | Role lock and audit logging are active; split admin roles later |
+| `/admin` | Sensitive data exposure | Role-specific admin permissions and audit logging are active; add super-admin role management later |
 
 ## Environment Variables To Document
 
@@ -125,4 +126,4 @@ This checklist captures the current security posture and the next hardening move
 4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
 5. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
 6. Add admin/global monitoring for code attempts and unlock events.
-7. Add role-specific admin permissions before hiring support/content staff.
+7. Add super-admin-only role management before hiring support/content staff.

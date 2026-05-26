@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAppUrl } from "../../lib/app-url";
 import { verifyCsrfToken } from "../../lib/csrf";
 import { requireGuest } from "../../lib/guest-auth";
 import { attemptPlayerCodeUnlock } from "../../lib/player-tools";
@@ -11,7 +12,7 @@ function getFormValue(formData: FormData, key: string) {
 }
 
 function redirectToPlay(request: Request, unlock?: string) {
-  const url = new URL("/play", request.url);
+  const url = createAppUrl("/play", request.url);
   if (unlock) url.searchParams.set("unlock", unlock);
   return NextResponse.redirect(url, 303);
 }

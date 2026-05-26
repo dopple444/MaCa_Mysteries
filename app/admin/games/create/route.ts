@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { hasAdminPermission } from "../../../lib/admin-permissions";
+import { createAppUrl } from "../../../lib/app-url";
 import { logAuditEvent } from "../../../lib/audit-log";
 import { getCurrentUser } from "../../../lib/auth";
 import { verifyCsrfToken } from "../../../lib/csrf";
@@ -24,16 +26,16 @@ function normalizeSlug(value: string) {
 }
 
 function redirectToNew(request: Request, error = "invalid") {
-  return NextResponse.redirect(new URL(`/admin/games/new?error=${error}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/admin/games/new?error=${error}`, request.url), 303);
 }
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  if (!hasAdminPermission(user, "content")) {
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
 
   const formData = await request.formData();
@@ -101,5 +103,5 @@ export async function POST(request: Request) {
     metadata: { slug, title }
   });
 
-  return NextResponse.redirect(new URL(`/admin/games/${game.id}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/admin/games/${game.id}`, request.url), 303);
 }

@@ -167,11 +167,15 @@ Admin payment operations now exist for common test and production-support cases:
 
 - `Admin > Payment operations > Cancel stale pending`: marks `PENDING` orders older than 24 hours as `CANCELLED`.
 - `Admin > Payment operations > Reconcile paid access`: reruns paid-order fulfillment and repairs missing `UserGameAccess` records.
+- `Admin > Payment operations > Recover Stripe checkouts`: checks pending Stripe Checkout sessions older than 10 minutes against Stripe, marks completed paid sessions as `PAID`, grants access, and queues the purchase confirmation email. This is the recovery path for a missed or misconfigured webhook.
+- `Admin > Payment operations > Queue alert`: queues a deduped email to `ADMIN_ALERT_EMAILS` when failed webhooks, stale pending orders, or recoverable Stripe checkouts need attention.
 - `Admin > Orders > Order detail > Reconcile access`: reruns fulfillment for one paid order.
 
 These operations are idempotent and audit logged. They are intended for abandoned Stripe Checkout sessions and webhook/fulfillment recovery, not refunds.
 
 Checkout/session failures are marked on the local `Order` as `FAILED`. Stripe webhook processing failures are marked on `PaymentWebhookEvent` as `FAILED`. Both paths emit structured payment logs to the app server output without printing Stripe keys or webhook secrets.
+
+For live testing, set `ADMIN_ALERT_EMAILS` to one or more operations inboxes and keep `EMAIL_PROVIDER` configured so payment-risk alerts can leave the outbound queue.
 
 ## Production Notes
 

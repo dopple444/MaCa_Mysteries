@@ -77,12 +77,15 @@ Last inspected: 2026-05-22
    - Status: implemented.
    - Stale pending orders older than 24 hours can be cancelled from Admin > Payment operations.
    - Paid orders can be reconciled from Admin > Payment operations or a specific admin order detail page.
+   - Pending Stripe Checkout sessions older than 10 minutes can be checked against Stripe and fulfilled if Stripe reports the session as complete/paid.
    - Restart steps for the staging app and Stripe Dashboard webhook setup are documented in `docs/PAYMENT_PROVIDER_SETUP.md`.
 
 5. Expand payment observability.
-   - Status: partially implemented.
+   - Status: implemented foundation.
    - Structured logs now cover checkout session creation/failure and Stripe webhook invalid/duplicate/completed/failed processing events.
-   - Add alerts for stuck pending orders and failed webhook events.
+   - Admin payment operations now shows an attention banner for failed webhooks and recoverable pending Stripe checkouts.
+   - Admin payment operations can queue deduped payment-risk alert emails to `ADMIN_ALERT_EMAILS` for failed webhooks, stale pending orders, and recoverable Stripe checkouts.
+   - Configure `ADMIN_ALERT_EMAILS` before live testing and keep email delivery healthy.
    - Add deeper filters for abandoned sessions and repeated checkout attempts.
 
 6. Choose and implement the email provider.
@@ -163,9 +166,11 @@ Last inspected: 2026-05-22
    - Dedicated SLA/status-history automation can be added later if support volume grows.
 
 17. Split admin roles.
-   - Add roles for support, content editor, finance, and super admin.
-   - Restrict payment, support, and spoiler-heavy content views by role.
-   - Audit permission changes.
+   - Status: implemented foundation.
+   - `UserRole` now includes `SUPER_ADMIN`, `CONTENT_EDITOR`, `SUPPORT`, and `FINANCE`.
+   - Admin pages and mutation routes are gated by content, payment, support, and outbound-message permissions.
+   - `ADMIN` remains fully compatible as a full-access operational role.
+   - Next: add super-admin-only role assignment, role-change audit history, and session revocation.
 
 18. Prepare production process, network layer, and security gates.
    - Status: in progress.
@@ -177,6 +182,10 @@ Last inspected: 2026-05-22
    - Document the exact local Ubuntu to data-center path.
 
 19. Automate backups and restore drills.
+   - Status: implemented foundation.
+   - `npm run backup:db` creates timestamped custom-format PostgreSQL dumps under `DATABASE_BACKUP_DIR`.
+   - The backup script uses host `pg_dump` when available and can fall back to a running Postgres Docker container.
+   - Server prerequisite still preferred: install PostgreSQL client tools so `pg_dump` and `pg_restore` are available directly.
    - Schedule PostgreSQL backups.
    - Store backups off-box.
    - Practice restore into a separate database before production launch.

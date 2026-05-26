@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAppUrl } from "../../../../lib/app-url";
 import { logAuditEvent } from "../../../../lib/audit-log";
 import { getCurrentUser } from "../../../../lib/auth";
 import { verifyCsrfToken } from "../../../../lib/csrf";
@@ -12,7 +13,7 @@ function getFormValue(formData: FormData, key: string) {
 }
 
 function redirectToParty(request: Request, partyId: string) {
-  return NextResponse.redirect(new URL(`/host/party/${partyId}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/host/party/${partyId}`, request.url), 303);
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ partyId: string }> }) {
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ par
   const user = await getCurrentUser();
 
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
 
   const formData = await request.formData();
@@ -30,7 +31,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ par
   const guestId = getFormValue(formData, "guestId");
 
   if (!partyId || !guestId) {
-    return NextResponse.redirect(new URL("/host?error=missing", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/host?error=missing", request.url), 303);
   }
 
   const party = await prisma.party.findUnique({
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ par
   });
 
   if (!party || party.hostId !== user.id) {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
   if (party.status === "COMPLETED") {
     return redirectToParty(request, partyId);

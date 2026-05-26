@@ -222,7 +222,7 @@ The app now has a foundation for advanced builder-authored unlock mechanics:
 
 The current Prisma schema contains:
 
-- `UserRole` enum: `HOST`, `PLAYER`, `ADMIN`
+- `UserRole` enum: `HOST`, `PLAYER`, `ADMIN`, `SUPER_ADMIN`, `CONTENT_EDITOR`, `SUPPORT`, `FINANCE`
 - `User`
 - `UserSession`
 - `Game`
@@ -263,7 +263,7 @@ The current Prisma schema contains:
 
 `Guest` now carries both party participation status and invitation delivery state: queued/sent/failed status, last queued/sent timestamps, resend count, and last failure detail.
 
-Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, fine-grained admin roles, and future marketplace entities.
+Current model coverage is strong enough for the first-party MVP foundation plus the first Game Builder / Conditional Reveal foundation. Still missing or shallow areas include final reveal editing, deeper readiness checks for circular/spoiler-wording rule risks, provider delivery webhooks, production object storage/signed URLs, super-admin role management UI, and future marketplace entities.
 
 ## Current Architectural Assessment
 
@@ -290,5 +290,5 @@ Gaps:
 - Email records can be queued, delivered through console dry-run or Resend, failed, and retried. Support replies queue customer emails and internal notes stay local. SMS records can be queued, failed, and retried, but no real SMS provider adapter is enabled yet.
 - Local admin media upload endpoints are enabled; S3-compatible writes, private signed URLs, malware scanning, and admin review are still needed.
 - Auth now has email verification and password reset foundations. It still lacks support/admin recovery procedures, account lockout policy, and admin session revocation tooling.
-- Admin roles are still coarse: `ADMIN` is all-powerful.
+- Admin role values and route gates now support full admin, content editor, finance, and support scopes. Role assignment/revocation UI is still missing.
 - A dedicated test database now exists for standard automated tests; backup automation is still needed before production launch.

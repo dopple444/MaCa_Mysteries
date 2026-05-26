@@ -102,11 +102,12 @@ The live test command requires the app server to already be running on port `300
 Before risky migrations or deployment changes, create a timestamped dump:
 
 ```bash
-mkdir -p /home/dopple444/backups/maca_mysteries
-pg_dump "$DATABASE_URL" > "/home/dopple444/backups/maca_mysteries/maca_mysteries_$(date -u +%Y%m%dT%H%M%SZ).sql"
+npm run backup:db
 ```
 
-If `DATABASE_URL` is not available in the shell, load it from the app environment first or use explicit `pg_dump` connection flags.
+The script loads `.env`, writes a custom-format `pg_dump` file under `DATABASE_BACKUP_DIR` or `/home/dopple444/backups/maca_mysteries`, and avoids printing the database URL. If host `pg_dump` is not installed, it can fall back to a running Postgres Docker container. Set `DATABASE_BACKUP_DOCKER_CONTAINER` if auto-detection picks the wrong container.
+
+Preferred prerequisite: the server should have PostgreSQL client tools installed so `pg_dump` and `pg_restore` are available. On Ubuntu, install them with `sudo apt install postgresql-client`.
 
 ## Database Restore Drill
 
@@ -114,7 +115,7 @@ Do not restore over a live database casually. For a drill, restore into a separa
 
 ```bash
 createdb maca_mysteries_restore_test
-psql maca_mysteries_restore_test < /path/to/backup.sql
+pg_restore --dbname=maca_mysteries_restore_test --no-owner --no-privileges /path/to/backup.dump
 ```
 
 After restore, run read-only smoke checks before trusting the backup.

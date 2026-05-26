@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { hasAdminPermission } from "../../../lib/admin-permissions";
 import { requireUser } from "../../../lib/auth";
 import { getCsrfToken } from "../../../lib/csrf";
 
@@ -25,7 +26,7 @@ export default async function AdminMediaUploadsPage({
   searchParams?: Promise<{ error?: string; uploaded?: string; url?: string; storageKey?: string; access?: string }>;
 }) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") notFound();
+  if (!hasAdminPermission(user, "content")) notFound();
   const csrfToken = await getCsrfToken();
   const query = await searchParams;
   const errorMessage = getUploadMessage(query?.error);

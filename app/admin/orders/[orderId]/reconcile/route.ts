@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { hasAdminPermission } from "../../../../lib/admin-permissions";
+import { createAppUrl } from "../../../../lib/app-url";
 import { logAuditEvent } from "../../../../lib/audit-log";
 import { getCurrentUser } from "../../../../lib/auth";
 import { verifyCsrfToken } from "../../../../lib/csrf";
@@ -8,15 +10,15 @@ import { reconcilePaidOrderAccess } from "../../../../lib/order-maintenance";
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  if (!hasAdminPermission(user, "payment")) {
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
 
   const formData = await request.formData();
   if (!(await verifyCsrfToken(formData))) {
-    return NextResponse.redirect(new URL("/admin", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/admin", request.url), 303);
   }
 
   const { orderId } = await params;
@@ -29,5 +31,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     metadata: result
   });
 
-  return NextResponse.redirect(new URL(`/admin/orders/${orderId}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/admin/orders/${orderId}`, request.url), 303);
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { hasAdminPermission } from "../../../lib/admin-permissions";
 import { requireUser } from "../../../lib/auth";
 import { getCsrfToken } from "../../../lib/csrf";
 import { prisma } from "../../../lib/prisma";
@@ -13,7 +14,7 @@ function formatActivityTime(date: Date) {
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ orderId: string }> }) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") notFound();
+  if (!hasAdminPermission(user, "payment")) notFound();
   const csrfToken = await getCsrfToken();
 
   const { orderId } = await params;

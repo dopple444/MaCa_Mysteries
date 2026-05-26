@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { hasAdminPermission } from "../../../../lib/admin-permissions";
+import { createAppUrl } from "../../../../lib/app-url";
 import { logAuditEvent } from "../../../../lib/audit-log";
 import { getCurrentUser } from "../../../../lib/auth";
 import { verifyCsrfToken } from "../../../../lib/csrf";
@@ -13,27 +15,27 @@ function getFormValue(formData: FormData, key: string) {
 }
 
 function redirectToTicket(request: Request, ticketId: string) {
-  return NextResponse.redirect(new URL(`/admin/support/${ticketId}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/admin/support/${ticketId}`, request.url), 303);
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ ticketId: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  if (!hasAdminPermission(user, "support")) {
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
 
   const { ticketId } = await params;
   const formData = await request.formData();
   if (!(await verifyCsrfToken(formData))) {
-    return NextResponse.redirect(new URL("/admin", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/admin", request.url), 303);
   }
   const status = getFormValue(formData, "status").toUpperCase();
 
   if (!ALLOWED_STATUSES.has(status)) {
-    return NextResponse.redirect(new URL("/admin", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/admin", request.url), 303);
   }
 
   const ticket = await prisma.supportTicket.findUnique({
@@ -42,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tic
   });
 
   if (!ticket) {
-    return NextResponse.redirect(new URL("/admin", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/admin", request.url), 303);
   }
 
   await prisma.supportTicket.update({

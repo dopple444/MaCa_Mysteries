@@ -11,6 +11,7 @@ import {
   UNLOCK_SCOPES,
   UNLOCK_TRIGGER_TYPES
 } from "../../../lib/admin-builder";
+import { hasAdminPermission } from "../../../lib/admin-permissions";
 import { requireUser } from "../../../lib/auth";
 import { getCsrfToken } from "../../../lib/csrf";
 import { getGameVersionPublishReadiness } from "../../../lib/publish-readiness";
@@ -146,7 +147,7 @@ export default async function AdminGameDetailPage({
   searchParams?: Promise<{ error?: string }>;
 }) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") notFound();
+  if (!hasAdminPermission(user, "content")) notFound();
   const csrfToken = await getCsrfToken();
 
   const { gameId } = await params;

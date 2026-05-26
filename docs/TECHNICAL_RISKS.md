@@ -58,8 +58,8 @@ Mitigation:
 
 - Run Stripe test mode end to end before selling.
 - Keep provider IDs isolated in payment services.
-- Admin views now expose failed webhooks, pending orders, stale pending-order cleanup, and paid access reconciliation; alerting still needs to be added.
-- Add reconciliation for paid provider sessions that did not fulfill locally.
+- Admin views now expose failed webhooks, pending orders, stale pending-order cleanup, paid access reconciliation, Stripe checkout recovery, and queued payment-risk alerts.
+- Configure `ADMIN_ALERT_EMAILS` before public live testing so failed webhooks and stuck payment states can be escalated through outbound email.
 
 ## Email And SMS
 
@@ -195,14 +195,14 @@ Mitigation:
 Current risk:
 
 - Docker production scaffolding exists, but the current server still runs directly on Ubuntu.
-- Production secret management, backup automation, reverse proxy/TLS, monitoring, and process supervision are not complete.
+- Production secret management, off-box backup scheduling, reverse proxy/TLS, monitoring, and process supervision are not complete.
 - The working tree contains a large uncommitted platform slice.
 
 Mitigation:
 
 - Commit the current slice when ready.
 - Keep the direct dev server on `192.168.2.45:3001` until Docker cutover is intentionally tested.
-- Add backups, restore drills, TLS/reverse proxy, firewall rules, and health checks.
+- Use `npm run backup:db` before risky migrations, then add scheduled off-box backups, restore drills, TLS/reverse proxy, firewall rules, and health checks.
 - Run `npx prisma migrate deploy`, `npm test`, `npm run build`, and live tests before production changes.
 
 ## Authorization Gaps
@@ -211,17 +211,17 @@ Current state:
 
 - Host identity is derived from authenticated sessions.
 - Party mutation routes verify ownership.
-- Admin routes require `ADMIN`.
+- Admin routes require operational admin permissions. `ADMIN` and `SUPER_ADMIN` retain full access; `CONTENT_EDITOR`, `FINANCE`, and `SUPPORT` are scoped to content, payment, support, and outbound-message areas.
 - Player routes use guest cookies and server-side visibility filters.
 
 Remaining risk:
 
 - Admin is still a single broad role.
-- Support, content, finance, and super-admin permissions should be split before staff or contractors use the system.
+- There is no super-admin UI yet for assigning roles, reviewing role history, or revoking sessions.
 
 Mitigation:
 
-- Add role-specific admin permissions.
+- Add super-admin-only role management and session revocation tooling.
 - Continue authorization tests for every new mutation route.
 - Keep audit logging on sensitive admin actions.
 

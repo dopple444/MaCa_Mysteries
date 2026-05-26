@@ -11,6 +11,10 @@ enum UserRole {
   HOST
   PLAYER
   ADMIN
+  SUPER_ADMIN
+  CONTENT_EDITOR
+  SUPPORT
+  FINANCE
 }
 
 model User {

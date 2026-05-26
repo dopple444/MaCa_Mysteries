@@ -16,7 +16,7 @@ function getFormValue(formData: FormData, key: string) {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
   const rateLimit = await checkRateLimit({
     scope: "checkout-start",

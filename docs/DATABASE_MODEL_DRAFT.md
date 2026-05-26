@@ -51,6 +51,7 @@ Suggested fields:
 Notes:
 
 - Current schema has `User.id`, `email`, `emailVerifiedAt`, `name`, `role`, `passwordHash`, phone/preference fields, and timestamps.
+- Current `UserRole` values are `HOST`, `PLAYER`, `ADMIN`, `SUPER_ADMIN`, `CONTENT_EDITOR`, `SUPPORT`, and `FINANCE`.
 - Add user status before production.
 
 ### accounts

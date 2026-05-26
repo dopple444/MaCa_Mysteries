@@ -24,3 +24,11 @@ test("createAppUrl builds browser-safe absolute URLs", () => {
     "http://192.168.2.45:3001/host/create?game=murder-at-hollow-lake"
   );
 });
+
+test("createAppUrl keeps host mutation redirects on the public staging URL", () => {
+  const url = createAppUrl("/host/party/party_123", "http://0.0.0.0:3001/host/party/party_123/assign", {
+    APP_URL: "https://staging.macamysteries.com"
+  });
+
+  assert.equal(url.toString(), "https://staging.macamysteries.com/host/party/party_123");
+});

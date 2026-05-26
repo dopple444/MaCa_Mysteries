@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { hasAdminPermission } from "../../../../lib/admin-permissions";
+import { createAppUrl } from "../../../../lib/app-url";
 import { logAuditEvent } from "../../../../lib/audit-log";
 import { getCurrentUser } from "../../../../lib/auth";
 import { verifyCsrfToken } from "../../../../lib/csrf";
@@ -11,16 +13,16 @@ function getFormValue(formData: FormData, key: string) {
 }
 
 function redirectToTicket(request: Request, ticketId: string) {
-  return NextResponse.redirect(new URL(`/admin/support/${ticketId}`, request.url), 303);
+  return NextResponse.redirect(createAppUrl(`/admin/support/${ticketId}`, request.url), 303);
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ ticketId: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/login", request.url), 303);
   }
-  if (user.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  if (!hasAdminPermission(user, "support")) {
+    return NextResponse.redirect(createAppUrl("/dashboard", request.url), 303);
   }
 
   const { ticketId } = await params;

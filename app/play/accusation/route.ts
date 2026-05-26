@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAppUrl } from "../../lib/app-url";
 import { logAuditEvent } from "../../lib/audit-log";
 import { verifyCsrfToken } from "../../lib/csrf";
 import { getCurrentGuest } from "../../lib/guest-auth";
@@ -14,19 +15,19 @@ export async function POST(request: Request) {
   const guest = await getCurrentGuest();
 
   if (!guest) {
-    return NextResponse.redirect(new URL("/join", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/join", request.url), 303);
   }
 
   if (guest.status !== "JOINED") {
-    return NextResponse.redirect(new URL("/play", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/play", request.url), 303);
   }
   if (guest.party.status === "COMPLETED") {
-    return NextResponse.redirect(new URL("/play", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/play", request.url), 303);
   }
 
   const formData = await request.formData();
   if (!(await verifyCsrfToken(formData))) {
-    return NextResponse.redirect(new URL("/play", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/play", request.url), 303);
   }
   const suspectCharacterId = getFormValue(formData, "suspectCharacterId");
   const motiveNotes = getFormValue(formData, "motiveNotes");
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   const accusationText = getFormValue(formData, "accusationText");
 
   if (!suspectCharacterId && !motiveNotes && !evidenceNotes && !accusationText) {
-    return NextResponse.redirect(new URL("/play", request.url), 303);
+    return NextResponse.redirect(createAppUrl("/play", request.url), 303);
   }
 
   let validSuspectCharacterId: string | null = null;
@@ -85,5 +86,5 @@ export async function POST(request: Request) {
     }
   });
 
-  return NextResponse.redirect(new URL("/play", request.url), 303);
+  return NextResponse.redirect(createAppUrl("/play", request.url), 303);
 }

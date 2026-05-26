@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { hasAdminPermission, isOperationalAdminRole } from "../lib/admin-permissions";
 import { requireUser } from "../lib/auth";
 import { getCsrfToken } from "../lib/csrf";
-import { getStalePendingOrderCutoff } from "../lib/order-maintenance";
+import {
+  getPaymentOperationsAlertRecipients,
+  getRecoverableStripeCheckoutCutoff,
+  getStalePendingOrderCutoff
+} from "../lib/order-maintenance";
 import { prisma } from "../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +43,10 @@ function getAuditLabel(action: string) {
       return "Stale pending orders cancelled";
     case "payment.orders.paidAccessReconciled":
       return "Paid order access reconciled";
+    case "payment.orders.stripeCheckoutsReconciled":
+      return "Stripe checkout recovery run";
+    case "payment.operations.alertQueued":
+      return "Payment operations alert queued";
     case "payment.order.accessReconciled":
       return "Order access reconciled";
     case "outbound.email.deliveryRun":
@@ -62,9 +71,14 @@ export default async function AdminPage({
   }>;
 }) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") notFound();
+  if (!isOperationalAdminRole(user.role)) notFound();
   const csrfToken = await getCsrfToken();
   const params = await searchParams;
+  const canViewAudit = hasAdminPermission(user, "content") && hasAdminPermission(user, "payment");
+  const canViewContent = hasAdminPermission(user, "content");
+  const canViewPayments = hasAdminPermission(user, "payment");
+  const canViewSupport = hasAdminPermission(user, "support");
+  const canViewOutbound = hasAdminPermission(user, "outbound");
   const messageStatus = params?.messageStatus?.trim().toUpperCase() ?? "";
   const messageChannel = params?.messageChannel?.trim().toUpperCase() ?? "";
   const orderStatus = params?.orderStatus?.trim().toUpperCase() ?? "";
@@ -80,6 +94,7 @@ export default async function AdminPage({
     ...(webhookStatus ? { status: webhookStatus } : {})
   };
   const stalePendingOrderCutoff = getStalePendingOrderCutoff();
+  const adminAlertRecipientCount = getPaymentOperationsAlertRecipients().length;
 
   const [
     games,
@@ -91,30 +106,33 @@ export default async function AdminPage({
     webhookEvents,
     stalePendingOrderCount,
     paidOrderCount,
-    failedWebhookEventCount
+    failedWebhookEventCount,
+    recoverableStripeCheckoutCount
   ] = await Promise.all([
-    prisma.game.findMany({
-      orderBy: { title: "asc" },
-      include: {
-        versions: {
-          orderBy: { versionNumber: "asc" },
+    canViewContent
+      ? prisma.game.findMany({
+          orderBy: { title: "asc" },
           include: {
-            _count: {
-              select: {
-                characters: true,
-                rounds: true,
-                evidence: true,
-                mediaAssets: true
+            versions: {
+              orderBy: { versionNumber: "asc" },
+              include: {
+                _count: {
+                  select: {
+                    characters: true,
+                    rounds: true,
+                    evidence: true,
+                    mediaAssets: true
+                  }
+                },
+                finalReveal: true
               }
             },
-            finalReveal: true
+            products: {
+              orderBy: { name: "asc" }
+            }
           }
-        },
-        products: {
-          orderBy: { name: "asc" }
-        }
-      }
-    }),
+        })
+      : Promise.resolve([]),
     prisma.$transaction([
       prisma.game.count(),
       prisma.gameVersion.count(),
@@ -132,94 +150,116 @@ export default async function AdminPage({
       prisma.supportTicket.count(),
       prisma.paymentWebhookEvent.count()
     ]),
-    prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 12,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        party: {
-          select: {
-            title: true
-          }
-        }
-      }
-    }),
-    prisma.order.findMany({
-      where: orderWhere,
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        items: {
+    canViewAudit
+      ? prisma.auditLog.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 12,
           include: {
-            product: {
+            user: {
               select: {
-                name: true
+                name: true,
+                email: true
+              }
+            },
+            party: {
+              select: {
+                title: true
               }
             }
           }
-        }
-      }
-    }),
-    prisma.outboundMessage.findMany({
-      where: outboundMessageWhere,
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
+        })
+      : Promise.resolve([]),
+    canViewPayments
+      ? prisma.order.findMany({
+          where: orderWhere,
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            },
+            items: {
+              include: {
+                product: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            }
           }
-        }
-      }
-    }),
-    prisma.supportTicket.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
+        })
+      : Promise.resolve([]),
+    canViewOutbound
+      ? prisma.outboundMessage.findMany({
+          where: outboundMessageWhere,
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
           }
-        }
-      }
-    }),
-    prisma.paymentWebhookEvent.findMany({
-      where: webhookEventWhere,
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: {
-        order: {
-          select: {
-            id: true,
-            email: true,
-            status: true,
-            totalCents: true,
-            currency: true
+        })
+      : Promise.resolve([]),
+    canViewSupport
+      ? prisma.supportTicket.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
           }
-        }
-      }
-    }),
-    prisma.order.count({
-      where: {
-        status: "PENDING",
-        createdAt: { lt: stalePendingOrderCutoff }
-      }
-    }),
-    prisma.order.count({ where: { status: "PAID" } }),
-    prisma.paymentWebhookEvent.count({ where: { status: "FAILED" } })
+        })
+      : Promise.resolve([]),
+    canViewPayments
+      ? prisma.paymentWebhookEvent.findMany({
+          where: webhookEventWhere,
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          include: {
+            order: {
+              select: {
+                id: true,
+                email: true,
+                status: true,
+                totalCents: true,
+                currency: true
+              }
+            }
+          }
+        })
+      : Promise.resolve([]),
+    canViewPayments
+      ? prisma.order.count({
+          where: {
+            status: "PENDING",
+            createdAt: { lt: stalePendingOrderCutoff }
+          }
+        })
+      : Promise.resolve(0),
+    canViewPayments ? prisma.order.count({ where: { status: "PAID" } }) : Promise.resolve(0),
+    canViewPayments ? prisma.paymentWebhookEvent.count({ where: { status: "FAILED" } }) : Promise.resolve(0),
+    canViewPayments
+      ? prisma.order.count({
+          where: {
+            status: "PENDING",
+            paymentProvider: "stripe",
+            paymentReference: { not: "" },
+            createdAt: { lt: getRecoverableStripeCheckoutCutoff() }
+          }
+        })
+      : Promise.resolve(0)
   ]);
 
   const [
@@ -240,23 +280,25 @@ export default async function AdminPage({
     paymentWebhookEventCount
   ] = totals;
 
-  const statCards = [
-    ["Games", gameCount],
-    ["Versions", versionCount],
-    ["Characters", characterCount],
-    ["Rounds", roundCount],
-    ["Cards", cardCount],
-    ["Evidence", evidenceCount],
-    ["Media", mediaCount],
-    ["Parties", partyCount],
-    ["Guests", guestCount],
-    ["Accusations", accusationCount],
-    ["Audit Logs", auditLogCount],
-    ["Orders", orderCount],
-    ["Messages", outboundMessageCount],
-    ["Support", supportTicketCount],
-    ["Webhooks", paymentWebhookEventCount]
-  ];
+  const statCards: Array<[string, number]> = [];
+  if (canViewContent) {
+    statCards.push(
+      ["Games", gameCount],
+      ["Versions", versionCount],
+      ["Characters", characterCount],
+      ["Rounds", roundCount],
+      ["Cards", cardCount],
+      ["Evidence", evidenceCount],
+      ["Media", mediaCount],
+      ["Parties", partyCount],
+      ["Guests", guestCount],
+      ["Accusations", accusationCount]
+    );
+  }
+  if (canViewAudit) statCards.push(["Audit Logs", auditLogCount]);
+  if (canViewPayments) statCards.push(["Orders", orderCount], ["Webhooks", paymentWebhookEventCount]);
+  if (canViewOutbound) statCards.push(["Messages", outboundMessageCount]);
+  if (canViewSupport) statCards.push(["Support", supportTicketCount]);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 text-slate-100">
@@ -266,20 +308,22 @@ export default async function AdminPage({
         <p className="mt-3 max-w-3xl text-slate-300">
           Read-only inventory for first-party game content and current play data.
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/admin/games/new"
-            className="inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-400"
-          >
-            Create game
-          </Link>
-          <Link
-            href="/admin/media/uploads"
-            className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
-          >
-            Upload media
-          </Link>
-        </div>
+        {canViewContent && (
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/admin/games/new"
+              className="inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-400"
+            >
+              Create game
+            </Link>
+            <Link
+              href="/admin/media/uploads"
+              className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
+            >
+              Upload media
+            </Link>
+          </div>
+        )}
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {statCards.map(([label, value]) => (
@@ -290,6 +334,7 @@ export default async function AdminPage({
           ))}
         </div>
 
+        {canViewPayments && (
         <section className="mt-8 rounded-3xl border border-white/10 bg-slate-950/80 p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -302,7 +347,14 @@ export default async function AdminPage({
               {failedWebhookEventCount} failed hooks
             </span>
           </div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {(failedWebhookEventCount > 0 || recoverableStripeCheckoutCount > 0) && (
+            <div className="mt-4 rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-4 text-sm leading-6 text-yellow-100">
+              Payment attention needed: {failedWebhookEventCount} failed webhook
+              {failedWebhookEventCount === 1 ? "" : "s"} and {recoverableStripeCheckoutCount} pending Stripe checkout
+              {recoverableStripeCheckoutCount === 1 ? "" : "s"} ready for recovery review.
+            </div>
+          )}
+          <div className="mt-4 grid gap-3 lg:grid-cols-4">
             <form action="/admin/orders/maintenance" method="post" className="rounded-2xl bg-slate-900/80 p-4">
               <input type="hidden" name="csrfToken" value={csrfToken} />
               <input type="hidden" name="operation" value="cancel-stale-pending" />
@@ -325,10 +377,36 @@ export default async function AdminPage({
                 Reconcile paid access
               </button>
             </form>
+            <form action="/admin/orders/maintenance" method="post" className="rounded-2xl bg-slate-900/80 p-4">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="operation" value="reconcile-stripe-checkouts" />
+              <p className="text-sm font-semibold text-white">Stripe checkout recovery</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Check {recoverableStripeCheckoutCount} pending Stripe checkout
+                {recoverableStripeCheckoutCount === 1 ? "" : "s"} older than 10 minutes and fulfill completed payments.
+              </p>
+              <button className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white">
+                Recover Stripe checkouts
+              </button>
+            </form>
+            <form action="/admin/orders/maintenance" method="post" className="rounded-2xl bg-slate-900/80 p-4">
+              <input type="hidden" name="csrfToken" value={csrfToken} />
+              <input type="hidden" name="operation" value="queue-payment-alert" />
+              <p className="text-sm font-semibold text-white">Payment alert email</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Queue a deduped alert to {adminAlertRecipientCount} configured operations recipient
+                {adminAlertRecipientCount === 1 ? "" : "s"}.
+              </p>
+              <button className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:border-white">
+                Queue alert
+              </button>
+            </form>
           </div>
         </section>
+        )}
 
         <div className="mt-10 space-y-4">
+          {canViewAudit && (
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-semibold text-white">Recent activity</h2>
@@ -357,8 +435,10 @@ export default async function AdminPage({
               )}
             </div>
           </section>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
+            {canViewPayments && (
             <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl font-semibold text-white">Recent orders</h2>
@@ -414,7 +494,9 @@ export default async function AdminPage({
                 )}
               </div>
             </section>
+            )}
 
+            {canViewOutbound && (
             <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl font-semibold text-white">Outbound messages</h2>
@@ -486,8 +568,10 @@ export default async function AdminPage({
                 )}
               </div>
             </section>
+            )}
           </div>
 
+          {canViewPayments && (
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-semibold text-white">Payment webhooks</h2>
@@ -545,7 +629,9 @@ export default async function AdminPage({
               )}
             </div>
           </section>
+          )}
 
+          {canViewSupport && (
           <section className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-2xl font-semibold text-white">Support queue</h2>
@@ -597,8 +683,9 @@ export default async function AdminPage({
               )}
             </div>
           </section>
+          )}
 
-          {games.length ? (
+          {canViewContent && games.length ? (
             games.map((game) => (
               <section key={game.id} className="rounded-3xl border border-white/10 bg-slate-950/80 p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -660,9 +747,9 @@ export default async function AdminPage({
                 </div>
               </section>
             ))
-          ) : (
+          ) : canViewContent ? (
             <p className="rounded-2xl bg-slate-950/80 p-4 text-slate-300">No games have been added yet.</p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { hasAdminPermission } from "../../../../../../lib/admin-permissions";
 import { BUILDER_PREVIEW_MODES, getBuilderPreview, type BuilderPreviewMode } from "../../../../../../lib/builder-preview";
 import { requireUser } from "../../../../../../lib/auth";
 
@@ -57,7 +58,7 @@ export default async function BuilderPreviewPage({
   searchParams?: Promise<Record<string, SearchValue>>;
 }) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") notFound();
+  if (!hasAdminPermission(user, "content")) notFound();
 
   const { gameId, versionId } = await params;
   const query = (await searchParams) ?? {};

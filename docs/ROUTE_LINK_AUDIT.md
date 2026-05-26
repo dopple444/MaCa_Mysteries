@@ -136,5 +136,5 @@ Latest live verification:
 3. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
 4. Add admin/global monitoring for player code attempts and unlock events.
 5. Add invite reminder scheduling after email operations settle.
-6. Add role-specific admin permissions before support/content/finance staff use admin pages.
+6. Add super-admin-only role assignment and session revocation before support/content/finance staff use admin pages.
 7. Add creator routes later, after the first-party builder, conditional engine, and first-party MVP are stable.
