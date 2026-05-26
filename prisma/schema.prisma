@@ -18,28 +18,34 @@ enum UserRole {
 }
 
 model User {
-  id                 String                  @id @default(cuid())
-  email              String                  @unique
-  name               String
-  role               UserRole                @default(HOST)
-  passwordHash       String?
-  emailVerifiedAt    DateTime?
-  phoneNumber        String                  @default("")
-  phoneVerifiedAt    DateTime?
-  notificationPrefs  Json                    @default("{}")
-  sessions           UserSession[]
-  parties            Party[]
-  evidenceReveals    PartyEvidenceReveal[]
-  finalRevealUnlocks PartyFinalRevealState[]
-  auditLogs          AuditLog[]
-  orders             Order[]
-  gameAccess         UserGameAccess[]
-  outboundMessages   OutboundMessage[]
-  supportTickets     SupportTicket[]
-  supportMessages    SupportTicketMessage[]
-  completedResults   PartyResult[]
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  id                            String                  @id @default(cuid())
+  email                         String                  @unique
+  name                          String
+  role                          UserRole                @default(HOST)
+  passwordHash                  String?
+  emailVerifiedAt               DateTime?
+  phoneNumber                   String                  @default("")
+  phoneVerifiedAt               DateTime?
+  notificationPrefs             Json                    @default("{}")
+  sessions                      UserSession[]
+  parties                       Party[]
+  evidenceReveals               PartyEvidenceReveal[]
+  finalRevealUnlocks            PartyFinalRevealState[]
+  auditLogs                     AuditLog[]
+  adminActionRequestsMade       AdminActionRequest[]    @relation("AdminActionRequestedBy")
+  adminActionRequestsTargeting  AdminActionRequest[]    @relation("AdminActionTargetUser")
+  adminActionRequestsReviewed   AdminActionRequest[]    @relation("AdminActionReviewedBy")
+  accountRecoveryCasesRequested AccountRecoveryCase[]   @relation("AccountRecoveryRequestedBy")
+  accountRecoveryCasesTargeting AccountRecoveryCase[]   @relation("AccountRecoveryTargetUser")
+  accountRecoveryCasesReviewed  AccountRecoveryCase[]   @relation("AccountRecoveryReviewedBy")
+  orders                        Order[]
+  gameAccess                    UserGameAccess[]
+  outboundMessages              OutboundMessage[]
+  supportTickets                SupportTicket[]
+  supportMessages               SupportTicketMessage[]
+  completedResults              PartyResult[]
+  createdAt                     DateTime                @default(now())
+  updatedAt                     DateTime                @updatedAt
 }
 
 model UserSession {
@@ -735,17 +741,79 @@ model AuditLog {
   @@index([action, createdAt])
 }
 
+model AdminActionRequest {
+  id                String    @id @default(cuid())
+  requestedByUserId String
+  requestedByUser   User      @relation("AdminActionRequestedBy", fields: [requestedByUserId], references: [id])
+  targetUserId      String?
+  targetUser        User?     @relation("AdminActionTargetUser", fields: [targetUserId], references: [id])
+  reviewedByUserId  String?
+  reviewedByUser    User?     @relation("AdminActionReviewedBy", fields: [reviewedByUserId], references: [id])
+  actionType        String
+  status            String    @default("PENDING")
+  targetType        String    @default("User")
+  targetId          String    @default("")
+  previousRole      String    @default("")
+  requestedRole     String    @default("")
+  reason            String    @default("")
+  reviewNote        String    @default("")
+  metadata          Json      @default("{}")
+  reviewedAt        DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([actionType, status])
+  @@index([requestedByUserId, createdAt])
+  @@index([targetUserId, status])
+  @@index([reviewedByUserId, reviewedAt])
+}
+
+model AccountRecoveryCase {
+  id                        String         @id @default(cuid())
+  requestedByUserId         String
+  requestedByUser           User           @relation("AccountRecoveryRequestedBy", fields: [requestedByUserId], references: [id])
+  targetUserId              String?
+  targetUser                User?          @relation("AccountRecoveryTargetUser", fields: [targetUserId], references: [id])
+  reviewedByUserId          String?
+  reviewedByUser            User?          @relation("AccountRecoveryReviewedBy", fields: [reviewedByUserId], references: [id])
+  supportTicketId           String?
+  supportTicket             SupportTicket? @relation(fields: [supportTicketId], references: [id])
+  email                     String
+  requestType               String         @default("ACCOUNT_ACCESS")
+  status                    String         @default("OPEN")
+  verificationStatus        String         @default("PENDING")
+  notes                     String         @default("")
+  resolutionNote            String         @default("")
+  passwordResetQueuedAt     DateTime?
+  emailVerificationQueuedAt DateTime?
+  sessionsRevokedAt         DateTime?
+  reviewedAt                DateTime?
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@index([verificationStatus, createdAt])
+  @@index([email, createdAt])
+  @@index([targetUserId, status])
+  @@index([requestedByUserId, createdAt])
+  @@index([reviewedByUserId, reviewedAt])
+  @@index([supportTicketId])
+}
+
 model SupportTicket {
-  id        String                 @id @default(cuid())
-  userId    String?
-  user      User?                  @relation(fields: [userId], references: [id])
-  email     String
-  subject   String
-  message   String
-  status    String                 @default("OPEN")
-  messages  SupportTicketMessage[]
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
+  id                   String                 @id @default(cuid())
+  userId               String?
+  user                 User?                  @relation(fields: [userId], references: [id])
+  email                String
+  subject              String
+  message              String
+  status               String                 @default("OPEN")
+  messages             SupportTicketMessage[]
+  accountRecoveryCases AccountRecoveryCase[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@index([status, createdAt])
   @@index([userId, createdAt])

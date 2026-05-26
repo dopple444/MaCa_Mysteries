@@ -89,6 +89,26 @@ async function deleteTestData(slugPrefix: string, emailDomain: string) {
   });
   const supportTicketIds = supportTickets.map((ticket) => ticket.id);
 
+  await prisma.accountRecoveryCase.deleteMany({
+    where: {
+      OR: [
+        { requestedByUserId: { in: userIds.length ? userIds : ["__none__"] } },
+        { targetUserId: { in: userIds.length ? userIds : ["__none__"] } },
+        { reviewedByUserId: { in: userIds.length ? userIds : ["__none__"] } },
+        { supportTicketId: { in: supportTicketIds.length ? supportTicketIds : ["__none__"] } },
+        { email: { endsWith: emailDomain } }
+      ]
+    }
+  });
+  await prisma.adminActionRequest.deleteMany({
+    where: {
+      OR: [
+        { requestedByUserId: { in: userIds.length ? userIds : ["__none__"] } },
+        { targetUserId: { in: userIds.length ? userIds : ["__none__"] } },
+        { reviewedByUserId: { in: userIds.length ? userIds : ["__none__"] } }
+      ]
+    }
+  });
   await prisma.supportTicketMessage.deleteMany({
     where: { ticketId: { in: supportTicketIds.length ? supportTicketIds : ["__none__"] } }
   });
@@ -576,8 +596,23 @@ test(
       const supportHtml = await supportResponse.text();
       assert.match(supportHtml, /Support queue/);
       assert.match(supportHtml, /Outbound messages/);
+      assert.match(supportHtml, /Account recovery/);
       assert.doesNotMatch(supportHtml, /Payment operations/);
       assert.doesNotMatch(supportHtml, /Create game/);
+
+      const supportRecoveryResponse = await fetch(`${appUrl}/admin/account-recovery`, {
+        headers: { cookie: sessionCookie(supportToken) },
+        redirect: "manual"
+      });
+      assert.equal(supportRecoveryResponse.status, 200);
+      const supportRecoveryHtml = await supportRecoveryResponse.text();
+      assert.match(supportRecoveryHtml, /Account recovery/);
+
+      const hostRecoveryResponse = await fetch(`${appUrl}/admin/account-recovery`, {
+        headers: { cookie: sessionCookie(hostToken) },
+        redirect: "manual"
+      });
+      assert.equal(hostRecoveryResponse.status, 404);
 
       const superAdminUsersResponse = await fetch(`${appUrl}/admin/users`, {
         headers: { cookie: sessionCookie(superAdminToken) },

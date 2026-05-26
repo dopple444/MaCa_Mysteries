@@ -18,7 +18,8 @@ This checklist captures the current security posture and the next hardening move
 - Admin conditional activity monitoring shows recent platform-wide code attempts, failed attempts, and unlock events without selecting or exposing stored code hashes.
 - Repeated failed access-code attempts can queue deduped admin alert emails through `OutboundMessage`.
 - Audit logs record core host, player, admin content, support, party status, invite resend, spoiler unlock, outbound retry, and auth/account-security events.
-- Super-admin user operations can assign roles, revoke sessions, search/filter accounts, and review recent account-security audit events, with bootstrap access for the first super administrator.
+- Super-admin user operations can request/approve sensitive role changes, revoke sessions, search/filter accounts, and review recent account-security audit events, with bootstrap access for the first super administrator.
+- Support-gated account recovery cases track identity review, matching support-ticket linkage, safe reset/verification email queueing, and recovery audit events without exposing signed links.
 - Guest invitation delivery state is server-side and does not expose gameplay spoilers.
 - Database-backed rate limiting is active for login, signup, guest join, support ticket intake, and checkout-start.
 - Email verification and password reset use signed account-action links delivered through queued email.
@@ -38,10 +39,10 @@ This checklist captures the current security posture and the next hardening move
 2. Account lifecycle.
    - Email verification and password reset foundations are implemented.
    - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
-   - Add admin recovery tooling before support staff handle real accounts.
+   - Admin recovery case tooling exists at `/admin/account-recovery`.
    - Session revocation tooling now exists for super-admin account operations.
-   - Add richer account recovery review workflows before support staff handle sensitive account changes.
-   - Account-security audit history is visible to super admins; add approval workflow before delegated staff can perform sensitive role changes.
+   - Account-security audit history and sensitive role-change approval requests are visible to super admins.
+   - Account recovery cases are visible to support-capable admins and require verified identity before queuing password reset email.
    - Consider session rotation after login and sensitive account changes.
 
 3. Secret management.
@@ -107,7 +108,8 @@ This checklist captures the current security posture and the next hardening move
 | `/api/webhooks/payments/stripe` | Spoofed payment events | Stripe HMAC signature verification and idempotency are active |
 | `/support` | Spam | Rate limit is active; add spam filtering later |
 | `/admin` | Sensitive data exposure | Role-specific admin permissions, audit logging, and super-admin user management are active |
-| `/admin/users` | Account takeover or staff over-permissioning | Super-admin-only role assignment/session revocation is active, with bootstrap only when no super admin exists and recent account-security history visible; add approval workflow later |
+| `/admin/users` | Account takeover or staff over-permissioning | Super-admin-only role requests/approval/session revocation are active, with bootstrap only when no super admin exists and recent account-security history visible |
+| `/admin/account-recovery` | Recovery abuse or support social engineering | Support-gated CSRF routes create cases, enforce support-ticket email matching, require verified identity before reset email queueing, and audit recovery actions |
 
 ## Environment Variables To Document
 
@@ -127,10 +129,10 @@ This checklist captures the current security posture and the next hardening move
 
 ## Recommended Next Code Changes
 
-1. Add admin account recovery review workflow and sensitive role-change approval policy.
+1. Add richer session metadata and account lockout/risk policy.
 2. Expand dedicated test database coverage with more browser-level mutation tests.
 3. Add structured logging for webhook, support, auth, and admin events.
 4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
 5. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
 6. Tune suspicious-attempt thresholds after real staging gameplay tests.
-7. Add approval policy for role changes before hiring support/content staff.
+7. Add richer approval policy rules before hiring support/content staff.

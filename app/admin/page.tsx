@@ -57,12 +57,28 @@ function getAuditLabel(action: string) {
       return "User role changed";
     case "admin.user.sessionsRevoked":
       return "User sessions revoked";
+    case "admin.actionRequest.created":
+      return "Admin approval requested";
+    case "admin.actionRequest.approved":
+      return "Admin approval accepted";
+    case "admin.actionRequest.denied":
+      return "Admin approval denied";
     case "account.created":
       return "Account created";
     case "account.email.verified":
       return "Email verified";
     case "account.password.reset":
       return "Password reset";
+    case "accountRecovery.case.created":
+      return "Account recovery case created";
+    case "accountRecovery.case.reviewed":
+      return "Account recovery case reviewed";
+    case "accountRecovery.passwordResetQueued":
+      return "Account recovery reset queued";
+    case "accountRecovery.emailVerificationQueued":
+      return "Account recovery verification queued";
+    case "accountRecovery.case.closed":
+      return "Account recovery case closed";
     case "auth.login.success":
       return "Sign-in succeeded";
     case "auth.login.failed":
@@ -172,6 +188,7 @@ export default async function AdminPage({
       prisma.order.count(),
       prisma.outboundMessage.count(),
       prisma.supportTicket.count(),
+      prisma.accountRecoveryCase.count(),
       prisma.paymentWebhookEvent.count()
     ]),
     canViewAudit
@@ -302,6 +319,7 @@ export default async function AdminPage({
     orderCount,
     outboundMessageCount,
     supportTicketCount,
+    accountRecoveryCaseCount,
     paymentWebhookEventCount
   ] = totals;
 
@@ -323,7 +341,7 @@ export default async function AdminPage({
   if (canViewAudit) statCards.push(["Audit Logs", auditLogCount]);
   if (canViewPayments) statCards.push(["Orders", orderCount], ["Webhooks", paymentWebhookEventCount]);
   if (canViewOutbound) statCards.push(["Messages", outboundMessageCount]);
-  if (canViewSupport) statCards.push(["Support", supportTicketCount]);
+  if (canViewSupport) statCards.push(["Support", supportTicketCount], ["Recovery", accountRecoveryCaseCount]);
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 text-slate-100">
@@ -356,6 +374,16 @@ export default async function AdminPage({
               className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
             >
               Manage users
+            </Link>
+          </div>
+        )}
+        {canViewSupport && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              href="/admin/account-recovery"
+              className="inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:border-white"
+            >
+              Account recovery
             </Link>
           </div>
         )}

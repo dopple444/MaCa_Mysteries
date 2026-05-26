@@ -68,6 +68,15 @@ export async function deleteCommerceFixture(slugPrefix: string, emailDomain: str
   await prisma.partyRoundState.deleteMany({ where: { partyId: { in: partyIds } } });
   await prisma.guest.deleteMany({ where: { partyId: { in: partyIds } } });
   await prisma.party.deleteMany({ where: { id: { in: partyIds } } });
+  await prisma.adminActionRequest.deleteMany({
+    where: {
+      OR: [
+        { requestedByUserId: { in: userIds } },
+        { targetUserId: { in: userIds } },
+        { reviewedByUserId: { in: userIds } }
+      ]
+    }
+  });
   await prisma.orderItem.deleteMany({ where: { OR: [{ orderId: { in: orderIds } }, { productId: { in: productIds } }] } });
   await prisma.order.deleteMany({
     where: {
@@ -94,6 +103,17 @@ export async function deleteCommerceFixture(slugPrefix: string, emailDomain: str
     select: { id: true }
   });
   const supportTicketIds = supportTickets.map((ticket) => ticket.id);
+  await prisma.accountRecoveryCase.deleteMany({
+    where: {
+      OR: [
+        { requestedByUserId: { in: userIds } },
+        { targetUserId: { in: userIds } },
+        { reviewedByUserId: { in: userIds } },
+        { supportTicketId: { in: supportTicketIds } },
+        { email: { endsWith: emailDomain } }
+      ]
+    }
+  });
   await prisma.supportTicketMessage.deleteMany({ where: { ticketId: { in: supportTicketIds } } });
   await prisma.supportTicket.deleteMany({ where: { id: { in: supportTicketIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });

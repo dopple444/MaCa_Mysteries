@@ -4,7 +4,7 @@ Last inspected: 2026-05-22
 
 ## Summary
 
-The app has moved from scaffold to self-hosted MVP foundation. The highest remaining risks are production auth/account recovery, real provider operations, spoiler leakage, conditional-rule correctness, content-editing complexity, media safety, deployment discipline, and future marketplace scale.
+The app has moved from scaffold to self-hosted MVP foundation. The highest remaining risks are production auth policy, real provider operations, spoiler leakage, conditional-rule correctness, content-editing complexity, media safety, deployment discipline, and future marketplace scale.
 
 ## Base44 Lock-In
 
@@ -38,14 +38,15 @@ Current risk:
 
 - Custom auth has sessions, password hashing, HTTP-only cookies, CSRF, and rate limiting.
 - It has email verification and password reset foundations.
-- Sign-in success/failure/rate-limit events, logout, account creation, email verification, password reset, role changes, and session revocations are audit logged and visible to super admins.
-- It still lacks full admin account recovery review workflow, account lockout policy, and OAuth.
+- Sign-in success/failure/rate-limit events, logout, account creation, email verification, password reset, role-change requests/approvals/denials, session revocations, and account recovery actions are audit logged and visible to the appropriate admin scopes.
+- Support-gated account recovery cases now exist for ticket-linked identity review and safe reset/verification email queueing.
+- It still lacks account lockout policy, richer session metadata, and OAuth.
 
 Mitigation:
 
-- Use `docs/ACCOUNT_RECOVERY_PROCEDURES.md` as the operating baseline and add admin tooling before public launch.
+- Use `docs/ACCOUNT_RECOVERY_PROCEDURES.md` as the operating baseline and run a recovery drill before public launch.
 - Add richer session metadata and keep super-admin revocation tools available for account recovery.
-- Continue auditing sensitive account events and add alerting/approval workflow for high-risk changes.
+- Continue auditing sensitive account events and add alerting for high-risk login/recovery patterns.
 - Consider Auth.js or another established auth library if OAuth/social login becomes important.
 
 ## Payment Integration
@@ -218,12 +219,12 @@ Current state:
 
 Remaining risk:
 
-- Admin is still a single broad role.
-- Super-admin UI now exists for assigning roles, revoking sessions, searching/filtering accounts, and reviewing recent role/session audit history.
+- Super-admin UI now exists for requesting/approving sensitive role changes, revoking sessions, searching/filtering accounts, and reviewing recent role/session audit history.
+- Support-gated account recovery exists, but session metadata and lockout policy are still shallow.
 
 Mitigation:
 
-- Add approval workflow for sensitive role changes and broader account recovery procedures.
+- Add broader login/security event monitoring, lockout rules, and session metadata.
 - Continue authorization tests for every new mutation route.
 - Keep audit logging on sensitive admin actions.
 

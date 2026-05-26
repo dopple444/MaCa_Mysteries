@@ -44,6 +44,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
   switch (result.status) {
     case "UPDATED":
       return redirectToUsers(request, { updated: "role" });
+    case "REQUESTED":
+      return redirectToUsers(request, { updated: "request" });
+    case "REQUEST_EXISTS":
+      return redirectToUsers(request, { updated: "request-exists" });
     case "UNCHANGED":
       return redirectToUsers(request, { updated: "unchanged" });
     case "INVALID_ROLE":

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  approveAdminActionRequest,
   canManageAdminUsers,
+  denyAdminActionRequest,
+  getAdminActionRequests,
   getManagedUsers,
   getRecentAdminUserEvents,
   revokeManagedUserSessions,
@@ -44,7 +47,7 @@ async function createAdminUsersFixture(prefix: string) {
   return { label, emailDomain, superAdmin, admin, target };
 }
 
-test("updateManagedUserRole lets super admins assign scoped roles and audit the change", async () => {
+test("updateManagedUserRole creates approval requests for sensitive role changes", async () => {
   const fixture = await createAdminUsersFixture("admin-users-role");
 
   try {
@@ -54,19 +57,103 @@ test("updateManagedUserRole lets super admins assign scoped roles and audit the 
       role: "SUPPORT"
     });
 
-    assert.equal(result.status, "UPDATED");
+    assert.equal(result.status, "REQUESTED");
+    assert.ok(result.requestId);
 
     const target = await prisma.user.findUnique({ where: { id: fixture.target.id } });
-    assert.equal(target?.role, "SUPPORT");
+    assert.equal(target?.role, "HOST");
+
+    const request = await prisma.adminActionRequest.findUniqueOrThrow({
+      where: { id: result.requestId }
+    });
+    assert.equal(request.status, "PENDING");
+    assert.equal(request.previousRole, "HOST");
+    assert.equal(request.requestedRole, "SUPPORT");
 
     const audit = await prisma.auditLog.findFirst({
+      where: {
+        userId: fixture.superAdmin.id,
+        action: "admin.actionRequest.created",
+        entityId: result.requestId
+      }
+    });
+    assert.ok(audit);
+  } finally {
+    await deleteCommerceFixture(fixture.label, fixture.emailDomain);
+  }
+});
+
+test("approveAdminActionRequest applies pending role changes and audits the review", async () => {
+  const fixture = await createAdminUsersFixture("admin-users-approve");
+
+  try {
+    const requested = await updateManagedUserRole({
+      actor: fixture.superAdmin,
+      targetUserId: fixture.target.id,
+      role: "CONTENT_EDITOR"
+    });
+
+    assert.equal(requested.status, "REQUESTED");
+    assert.ok(requested.requestId);
+
+    const approved = await approveAdminActionRequest({
+      actor: fixture.superAdmin,
+      requestId: requested.requestId
+    });
+
+    assert.equal(approved.status, "APPROVED");
+
+    const target = await prisma.user.findUnique({ where: { id: fixture.target.id } });
+    assert.equal(target?.role, "CONTENT_EDITOR");
+
+    const request = await prisma.adminActionRequest.findUniqueOrThrow({
+      where: { id: requested.requestId }
+    });
+    assert.equal(request.status, "APPROVED");
+    assert.equal(request.reviewedByUserId, fixture.superAdmin.id);
+    assert.ok(request.reviewedAt);
+
+    const roleAudit = await prisma.auditLog.findFirst({
       where: {
         userId: fixture.superAdmin.id,
         action: "admin.user.roleChanged",
         entityId: fixture.target.id
       }
     });
-    assert.ok(audit);
+    assert.ok(roleAudit);
+  } finally {
+    await deleteCommerceFixture(fixture.label, fixture.emailDomain);
+  }
+});
+
+test("denyAdminActionRequest closes pending role changes without updating the user", async () => {
+  const fixture = await createAdminUsersFixture("admin-users-deny");
+
+  try {
+    const requested = await updateManagedUserRole({
+      actor: fixture.superAdmin,
+      targetUserId: fixture.target.id,
+      role: "FINANCE"
+    });
+
+    assert.equal(requested.status, "REQUESTED");
+    assert.ok(requested.requestId);
+
+    const denied = await denyAdminActionRequest({
+      actor: fixture.superAdmin,
+      requestId: requested.requestId
+    });
+
+    assert.equal(denied.status, "DENIED");
+
+    const target = await prisma.user.findUnique({ where: { id: fixture.target.id } });
+    assert.equal(target?.role, "HOST");
+
+    const request = await prisma.adminActionRequest.findUniqueOrThrow({
+      where: { id: requested.requestId }
+    });
+    assert.equal(request.status, "DENIED");
+    assert.equal(request.reviewedByUserId, fixture.superAdmin.id);
   } finally {
     await deleteCommerceFixture(fixture.label, fixture.emailDomain);
   }
@@ -80,6 +167,17 @@ test("getManagedUsers filters accounts by role and search text", async () => {
       actor: fixture.superAdmin,
       targetUserId: fixture.target.id,
       role: "SUPPORT"
+    });
+    await approveAdminActionRequest({
+      actor: fixture.superAdmin,
+      requestId: (await prisma.adminActionRequest.findFirstOrThrow({
+        where: {
+          requestedByUserId: fixture.superAdmin.id,
+          targetUserId: fixture.target.id,
+          requestedRole: "SUPPORT"
+        },
+        select: { id: true }
+      })).id
     });
 
     const matchingUsers = await getManagedUsers({
@@ -195,7 +293,7 @@ test("getRecentAdminUserEvents returns account security audit events with actor 
 
     const events = await getRecentAdminUserEvents(5);
     const event = events.find(
-      (candidate) => candidate.action === "admin.user.roleChanged" && candidate.entityId === fixture.target.id
+      (candidate) => candidate.action === "admin.actionRequest.created" && candidate.entityId
     );
     const authEvent = events.find(
       (candidate) => candidate.action === "auth.login.success" && candidate.entityId === fixture.target.id
@@ -203,9 +301,12 @@ test("getRecentAdminUserEvents returns account security audit events with actor 
 
     assert.ok(event);
     assert.equal(event.user?.email, fixture.superAdmin.email);
-    assert.equal((event.metadata as Record<string, string>).nextRole, "CONTENT_EDITOR");
+    assert.equal((event.metadata as Record<string, string>).requestedRole, "CONTENT_EDITOR");
     assert.ok(authEvent);
     assert.equal(authEvent.user?.email, fixture.target.email);
+
+    const requests = await getAdminActionRequests(5);
+    assert.ok(requests.some((request) => request.targetUserId === fixture.target.id && request.status === "PENDING"));
   } finally {
     await deleteCommerceFixture(fixture.label, fixture.emailDomain);
   }

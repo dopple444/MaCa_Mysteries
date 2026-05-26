@@ -14,7 +14,7 @@ Current implemented Prisma models now cover the first-party MVP plus the Game Bu
 - Builder/conditional content: `GameDigitalArtifact`, `GameCharacterTool`, `GameUnlockRule`
 - Party runtime: `Party`, `Guest`, `PartyCharacterAssignment`, `PartyRoundState`, `PartyEvidenceReveal`, `PartyFinalRevealState`, `PartyAccusation`, `PartyResult`
 - Conditional runtime: `PartyToolInstance`, `PartyUnlockEvent`, `PartyCodeAttempt`, `PartyAssetView`, `PartyPlayerInteraction`, `PartyPlayerInventory`
-- Operations: `OutboundMessage`, `SupportTicket`, `SupportTicketMessage`, `AuditLog`, `RateLimitBucket`
+- Operations: `OutboundMessage`, `SupportTicket`, `SupportTicketMessage`, `AuditLog`, `AdminActionRequest`, `AccountRecoveryCase`, `RateLimitBucket`
 
 Target models below use snake_case table names because the requested documentation names them that way. Prisma model names can be PascalCase with `@@map()` if desired.
 
@@ -93,6 +93,71 @@ Notes:
 
 - Current schema has `UserSession`.
 - Consider renaming/mapping to `sessions` or keeping `user_sessions`.
+
+### admin_action_requests
+
+Tracks super-admin approval requests for sensitive account operations.
+
+Current implemented fields:
+
+- `id`
+- `requested_by_user_id`
+- `target_user_id`
+- `reviewed_by_user_id`
+- `action_type`
+- `status`
+- `target_type`
+- `target_id`
+- `previous_role`
+- `requested_role`
+- `reason`
+- `review_note`
+- `metadata`
+- `reviewed_at`
+- `expires_at`
+- `created_at`
+- `updated_at`
+
+Current use:
+
+- Sensitive role changes involving operational roles are queued as `PENDING` approval requests instead of immediately changing the user.
+- Approve/deny actions are CSRF-protected, audit logged, and visible on `/admin/users`.
+- First-super-admin bootstrap remains direct when no `SUPER_ADMIN` exists yet.
+
+### account_recovery_cases
+
+Tracks support/admin account recovery reviews without exposing reset links.
+
+Current Prisma name: `AccountRecoveryCase`.
+
+Current implemented fields:
+
+- `id`
+- `requested_by_user_id`
+- `target_user_id`
+- `reviewed_by_user_id`
+- `support_ticket_id`
+- `email`
+- `request_type`
+- `status`
+- `verification_status`
+- `notes`
+- `resolution_note`
+- `password_reset_queued_at`
+- `email_verification_queued_at`
+- `sessions_revoked_at`
+- `reviewed_at`
+- `created_at`
+- `updated_at`
+
+Current use:
+
+- `/admin/account-recovery` is visible to support-capable admin roles.
+- Cases can link to support tickets, but the account email must match the ticket email.
+- Password reset emails can be queued from a case only after identity verification is marked `VERIFIED`.
+- Email verification messages can be requeued for unverified target accounts.
+- Recovery actions are audit logged with `accountRecovery.*` actions.
+- Signed reset/verification links remain inside queued outbound email content and are not shown in admin UI.
 
 ## Catalog And Game Content
 

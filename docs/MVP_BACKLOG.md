@@ -51,6 +51,7 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 - As an admin, I can upload or attach media assets so games can include rich clues.
 - As an admin, I can create and edit conditional reveal rules, digital artifacts, and character tools so advanced game mechanics can be reviewed before publishing.
 - As an admin, I can run publish-readiness validation before publishing so missing required content and unsafe conditional unlock wiring are caught.
+- As a support admin, I can create account recovery cases, record identity verification, and queue recovery emails without exposing reset links.
 
 ## Should Have
 
@@ -86,6 +87,7 @@ Initial MVP should sell and run MaCa Mysteries / Burnett Games first-party murde
 
 - As an admin, I can duplicate a game version so edits can start from the previous published version.
 - As an admin, I can view audit logs for spoiler unlocks, publishing, and payment events.
+- As an admin, I can review account security and recovery audit events so sensitive account help is traceable.
 - As an admin, I can run deeper conditional-rule QA reports for circular dependencies, spoiler wording, asset-view triggers, host-approval triggers, reveal-state triggers, and multi-player interaction rules.
 
 ## Could Have

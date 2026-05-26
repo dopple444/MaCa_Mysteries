@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { USER_ROLE_OPTIONS } from "../../lib/admin-permissions";
 import {
   getAdminUserManagementContext,
+  getAdminActionRequests,
   getManagedUsers,
   getRecentAdminUserEvents,
   normalizeManagedUserRoleFilter,
@@ -22,8 +23,14 @@ function getStatusMessage(error?: string, updated?: string) {
   if (error === "last-super-admin") return "At least one super administrator must remain active.";
   if (error === "invalid-role") return "Choose a valid role.";
   if (error === "missing-user") return "That user could not be found.";
+  if (error === "missing-request") return "That approval request could not be found.";
+  if (error === "request-not-pending") return "That approval request has already been reviewed.";
   if (error === "csrf") return "The request expired. Try again.";
   if (updated === "role") return "Role updated.";
+  if (updated === "request") return "Role change approval request created.";
+  if (updated === "request-exists") return "A pending approval request already exists for that role change.";
+  if (updated === "request-approved") return "Approval request approved and role updated.";
+  if (updated === "request-denied") return "Approval request denied.";
   if (updated === "sessions") return "Sessions revoked.";
   if (updated === "unchanged") return "No role change was needed.";
   return "";
@@ -43,6 +50,12 @@ function getAdminUserEventTitle(action: string) {
       return "Role changed";
     case "admin.user.sessionsRevoked":
       return "Sessions revoked";
+    case "admin.actionRequest.created":
+      return "Approval requested";
+    case "admin.actionRequest.approved":
+      return "Approval accepted";
+    case "admin.actionRequest.denied":
+      return "Approval denied";
     case "account.created":
       return "Account created";
     case "account.email.verified":
@@ -84,6 +97,17 @@ function getAdminUserEventDetail(log: Awaited<ReturnType<typeof getRecentAdminUs
   return targetEmail;
 }
 
+function getRoleDisplay(role: string) {
+  return (USER_ROLE_OPTIONS as readonly string[]).includes(role)
+    ? getUserRoleLabel(role as Parameters<typeof getUserRoleLabel>[0])
+    : role || "Unknown";
+}
+
+function getRequestActorName(user: { name: string; email: string } | null) {
+  if (!user) return "Unknown";
+  return user.name || user.email;
+}
+
 export default async function AdminUsersPage({
   searchParams
 }: {
@@ -105,9 +129,10 @@ export default async function AdminUsersPage({
   const filterQueryString = filterQuery.toString();
   const actionQueryString = filterQueryString ? `?${filterQueryString}` : "";
 
-  const [users, recentEvents] = await Promise.all([
+  const [users, recentEvents, actionRequests] = await Promise.all([
     getManagedUsers({ query: search, role: roleFilter }),
-    getRecentAdminUserEvents()
+    getRecentAdminUserEvents(),
+    getAdminActionRequests()
   ]);
 
   return (
@@ -199,6 +224,67 @@ export default async function AdminUsersPage({
             </div>
           ) : (
             <p className="mt-4 text-sm text-slate-400">No role or session changes have been logged yet.</p>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl bg-slate-950/70 p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-white">Approval requests</h2>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+              {actionRequests.filter((request) => request.status === "PENDING").length} pending
+            </p>
+          </div>
+          {actionRequests.length ? (
+            <div className="mt-4 grid gap-3">
+              {actionRequests.map((request) => (
+                <article key={request.id} className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-white">
+                          {request.actionType === "USER_ROLE_CHANGE" ? "Role change" : request.actionType}
+                        </p>
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+                          {request.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300">
+                        {request.targetUser?.name || request.targetUser?.email || "Unknown account"}:{" "}
+                        {getRoleDisplay(request.previousRole)} to {getRoleDisplay(request.requestedRole)}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Requested by {getRequestActorName(request.requestedByUser)} at{" "}
+                        {formatActivityTime(request.createdAt)}
+                      </p>
+                      {request.reviewedByUser && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Reviewed by {getRequestActorName(request.reviewedByUser)} at{" "}
+                          {request.reviewedAt ? formatActivityTime(request.reviewedAt) : "unknown time"}
+                        </p>
+                      )}
+                    </div>
+                    {request.status === "PENDING" && (
+                      <div className="flex flex-wrap gap-2">
+                        <form action={`/admin/users/requests/${request.id}/approve`} method="post">
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <button className="rounded-full border border-emerald-300/30 px-4 py-2 text-sm font-semibold text-emerald-100 hover:border-emerald-200">
+                            Approve
+                          </button>
+                        </form>
+                        <form action={`/admin/users/requests/${request.id}/deny`} method="post">
+                          <input type="hidden" name="csrfToken" value={csrfToken} />
+                          <button className="rounded-full border border-red-300/30 px-4 py-2 text-sm font-semibold text-red-100 hover:border-red-200">
+                            Deny
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-400">No account approval requests have been created yet.</p>
           )}
         </section>
 

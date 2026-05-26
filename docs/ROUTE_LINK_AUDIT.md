@@ -128,13 +128,13 @@ Latest live verification:
 | Admin builder preview | Implemented foundation | Admin-only page previews visible cards, evidence, media, artifacts, and tools by host/player mode, round progress, and simulated unlocks. |
 | Publish-readiness validation | Implemented foundation | Admin game detail shows readiness errors/warnings and publish attempts are blocked when required content or conditional unlock wiring is unsafe. |
 | Admin media uploads | Implemented local foundation | Admin-only CSRF upload form validates MIME/size and writes public local media under `/uploads/media/...`; private local files stay outside `public/`. |
+| Admin account recovery | Implemented foundation | Support-gated account recovery cases link matching support tickets, track identity review, queue safe recovery emails, and audit actions. |
 
 ## Remaining Link/Route Work
 
 1. Add deeper admin editors for final reveal content.
 2. Add S3-compatible upload writes and signed private media URLs.
 3. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
-4. Add admin/global monitoring for player code attempts and unlock events.
-5. Add invite reminder scheduling after email operations settle.
-6. Add super-admin-only role assignment and session revocation before support/content/finance staff use admin pages.
-7. Add creator routes later, after the first-party builder, conditional engine, and first-party MVP are stable.
+4. Add invite reminder scheduling after email operations settle.
+5. Add richer session metadata and account lockout/risk policy.
+6. Add creator routes later, after the first-party builder, conditional engine, and first-party MVP are stable.
