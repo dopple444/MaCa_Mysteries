@@ -607,12 +607,34 @@ test(
       assert.equal(supportRecoveryResponse.status, 200);
       const supportRecoveryHtml = await supportRecoveryResponse.text();
       assert.match(supportRecoveryHtml, /Account recovery/);
+      assert.match(supportRecoveryHtml, /Queue risk alert/);
 
       const hostRecoveryResponse = await fetch(`${appUrl}/admin/account-recovery`, {
         headers: { cookie: sessionCookie(hostToken) },
         redirect: "manual"
       });
       assert.equal(hostRecoveryResponse.status, 404);
+
+      const unauthenticatedRecoveryAlertResponse = await fetch(`${appUrl}/admin/account-recovery/alerts`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({}),
+        redirect: "manual"
+      });
+      assert.equal(unauthenticatedRecoveryAlertResponse.status, 303);
+      assert.equal(locationPath(unauthenticatedRecoveryAlertResponse.headers.get("location")), "/login");
+
+      const hostRecoveryAlertResponse = await fetch(`${appUrl}/admin/account-recovery/alerts`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: sessionCookie(hostToken)
+        },
+        body: new URLSearchParams({}),
+        redirect: "manual"
+      });
+      assert.equal(hostRecoveryAlertResponse.status, 303);
+      assert.equal(locationPath(hostRecoveryAlertResponse.headers.get("location")), "/dashboard");
 
       const superAdminUsersResponse = await fetch(`${appUrl}/admin/users`, {
         headers: { cookie: sessionCookie(superAdminToken) },
