@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createAccountRecoveryCase,
+  getAccountRecoveryReport,
   queueAccountRecoveryEmailVerification,
   queueAccountRecoveryPasswordReset,
   reviewAccountRecoveryCase
@@ -212,6 +213,90 @@ test("account recovery can queue email verification and close cases", async () =
       caseId: created.caseId
     });
     assert.equal(blocked.status, "CLOSED");
+  } finally {
+    await deleteCommerceFixture(fixture.label, fixture.emailDomain);
+  }
+});
+
+test("account recovery report summarizes active, stale, and recent actioned cases", async () => {
+  const fixture = await createAccountRecoveryFixture("account-recovery-report");
+  const now = new Date("2026-05-26T12:00:00.000Z");
+  const staleCreatedAt = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+  const recentActionAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+  try {
+    await prisma.accountRecoveryCase.createMany({
+      data: [
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          email: `open-pending${fixture.emailDomain}`,
+          status: "OPEN",
+          verificationStatus: "PENDING",
+          createdAt: staleCreatedAt
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          email: `open-verified${fixture.emailDomain}`,
+          status: "OPEN",
+          verificationStatus: "VERIFIED",
+          createdAt: now
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          email: `actioned-reset${fixture.emailDomain}`,
+          status: "ACTIONED",
+          verificationStatus: "VERIFIED",
+          createdAt: staleCreatedAt,
+          passwordResetQueuedAt: recentActionAt
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          email: `actioned-verification${fixture.emailDomain}`,
+          status: "ACTIONED",
+          verificationStatus: "VERIFIED",
+          createdAt: now,
+          emailVerificationQueuedAt: recentActionAt
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          reviewedByUserId: fixture.support.id,
+          email: `closed${fixture.emailDomain}`,
+          status: "CLOSED",
+          verificationStatus: "VERIFIED",
+          createdAt: now,
+          reviewedAt: recentActionAt
+        },
+        {
+          requestedByUserId: fixture.support.id,
+          targetUserId: fixture.target.id,
+          reviewedByUserId: fixture.support.id,
+          email: `denied${fixture.emailDomain}`,
+          status: "DENIED",
+          verificationStatus: "FAILED",
+          createdAt: now,
+          reviewedAt: recentActionAt
+        }
+      ]
+    });
+
+    const report = await getAccountRecoveryReport({ now, staleAfterHours: 48, recentDays: 7 });
+
+    assert.equal(report.openCaseCount, 2);
+    assert.equal(report.actionedCaseCount, 2);
+    assert.equal(report.pendingVerificationCount, 1);
+    assert.equal(report.verifiedOpenCaseCount, 1);
+    assert.equal(report.staleOpenCaseCount, 2);
+    assert.equal(report.passwordResetQueuedRecentCount, 1);
+    assert.equal(report.emailVerificationQueuedRecentCount, 1);
+    assert.equal(report.closedRecentCount, 1);
+    assert.equal(report.deniedRecentCount, 1);
+    assert.equal(report.staleCutoff.toISOString(), "2026-05-24T12:00:00.000Z");
+    assert.equal(report.recentCutoff.toISOString(), "2026-05-19T12:00:00.000Z");
   } finally {
     await deleteCommerceFixture(fixture.label, fixture.emailDomain);
   }

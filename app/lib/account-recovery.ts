@@ -29,6 +29,12 @@ type ReviewAccountRecoveryCaseInput = AccountRecoveryCaseInput & {
   note?: string | null;
 };
 
+type AccountRecoveryReportInput = {
+  now?: Date;
+  staleAfterHours?: number;
+  recentDays?: number;
+};
+
 const ACCOUNT_RECOVERY_REQUEST_TYPES = [
   "ACCOUNT_ACCESS",
   "PASSWORD_RESET",
@@ -169,6 +175,87 @@ export async function getRecentAccountRecoveryAuditEvents(take = 12) {
       }
     }
   });
+}
+
+export async function getAccountRecoveryReport(input: AccountRecoveryReportInput = {}) {
+  const now = input.now ?? new Date();
+  const staleAfterHours =
+    Number.isFinite(input.staleAfterHours) && input.staleAfterHours && input.staleAfterHours > 0
+      ? input.staleAfterHours
+      : 48;
+  const recentDays =
+    Number.isFinite(input.recentDays) && input.recentDays && input.recentDays > 0 ? input.recentDays : 7;
+  const staleCutoff = new Date(now.getTime() - staleAfterHours * 60 * 60 * 1000);
+  const recentCutoff = new Date(now.getTime() - recentDays * 24 * 60 * 60 * 1000);
+
+  const [
+    openCaseCount,
+    actionedCaseCount,
+    pendingVerificationCount,
+    verifiedOpenCaseCount,
+    staleOpenCaseCount,
+    passwordResetQueuedRecentCount,
+    emailVerificationQueuedRecentCount,
+    closedRecentCount,
+    deniedRecentCount
+  ] = await prisma.$transaction([
+    prisma.accountRecoveryCase.count({ where: { status: "OPEN" } }),
+    prisma.accountRecoveryCase.count({ where: { status: "ACTIONED" } }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        status: { in: ["OPEN", "ACTIONED"] },
+        verificationStatus: "PENDING"
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        status: "OPEN",
+        verificationStatus: "VERIFIED"
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        status: { in: ["OPEN", "ACTIONED"] },
+        createdAt: { lt: staleCutoff }
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        passwordResetQueuedAt: { gte: recentCutoff }
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        emailVerificationQueuedAt: { gte: recentCutoff }
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        status: "CLOSED",
+        reviewedAt: { gte: recentCutoff }
+      }
+    }),
+    prisma.accountRecoveryCase.count({
+      where: {
+        status: "DENIED",
+        reviewedAt: { gte: recentCutoff }
+      }
+    })
+  ]);
+
+  return {
+    openCaseCount,
+    actionedCaseCount,
+    pendingVerificationCount,
+    verifiedOpenCaseCount,
+    staleOpenCaseCount,
+    passwordResetQueuedRecentCount,
+    emailVerificationQueuedRecentCount,
+    closedRecentCount,
+    deniedRecentCount,
+    staleCutoff,
+    recentCutoff
+  };
 }
 
 export async function createAccountRecoveryCase(input: CreateAccountRecoveryCaseInput) {

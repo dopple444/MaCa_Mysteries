@@ -108,11 +108,11 @@ Last inspected: 2026-05-22
    - Verification/reset messages are queued as `OutboundMessage` emails for console/Resend delivery.
    - Password reset revokes existing sessions and signs the user in with the new password.
    - Support/admin recovery procedures are documented in `docs/ACCOUNT_RECOVERY_PROCEDURES.md`.
-   - `/admin/account-recovery` lets support-capable admins create recovery cases, link matching support tickets, mark identity verification state, queue password reset/email verification messages, and close cases without exposing signed recovery links.
+   - `/admin/account-recovery` lets support-capable admins create recovery cases, link matching support tickets, mark identity verification state, queue password reset/email verification messages, review active/stale/recent recovery counts, and close cases without exposing signed recovery links.
    - Session metadata and the first account lockout policy are implemented.
    - Repeated-login lockouts queue deduped account-security alert emails to configured admin alert recipients.
    - Password reset invalidates active sessions for the affected account.
-   - Next: add recovery drill reporting, session rotation after additional sensitive changes, and deeper risk scoring before production launch.
+   - Next: run a recovery drill, add session rotation after additional sensitive changes, and deepen risk scoring before production launch.
 
 8. Choose and implement the SMS provider.
    - Pick Twilio or another provider.

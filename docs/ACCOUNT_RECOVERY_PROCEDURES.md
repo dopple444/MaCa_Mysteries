@@ -51,6 +51,7 @@ The admin account recovery view now includes:
 - Active session metadata, order, party, and support-ticket account counts.
 - Recovery case creation and support-ticket linking.
 - Identity verification state.
+- Active, stale, pending-ID, and recent-action recovery report counts.
 - Guarded resend verification/reset actions.
 - Audit log entries for recovery actions.
 
@@ -80,3 +81,4 @@ Use `/admin/users` for super-admin session revocation when a compromised session
 - Confirm `/admin/account-recovery` is visible only to support-capable admin roles.
 - Confirm super-admin session revocation remains available through `/admin/users` and retains revocation metadata.
 - Run an account recovery drill with a support ticket, verified case, queued reset email, and closed case.
+- Confirm the recovery report counts update for open, actioned, stale, closed, and denied cases.

@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getRecentAccountRecoveryAuditEvents, getRecentAccountRecoveryCases } from "../../lib/account-recovery";
+import {
+  getAccountRecoveryReport,
+  getRecentAccountRecoveryAuditEvents,
+  getRecentAccountRecoveryCases
+} from "../../lib/account-recovery";
 import { hasAdminPermission } from "../../lib/admin-permissions";
 import { getUserRoleLabel, requireUser } from "../../lib/auth";
 import { getCsrfToken } from "../../lib/csrf";
@@ -75,9 +79,10 @@ export default async function AdminAccountRecoveryPage({
   const statusMessage = getStatusMessage(params?.error, params?.updated);
   const statusClass = params?.error ? "bg-yellow-500/10 text-yellow-100" : "bg-emerald-500/10 text-emerald-100";
 
-  const [recoveryCases, auditEvents] = await Promise.all([
+  const [recoveryCases, auditEvents, recoveryReport] = await Promise.all([
     getRecentAccountRecoveryCases(),
-    getRecentAccountRecoveryAuditEvents()
+    getRecentAccountRecoveryAuditEvents(),
+    getAccountRecoveryReport()
   ]);
 
   return (
@@ -93,6 +98,42 @@ export default async function AdminAccountRecoveryPage({
         </p>
 
         {statusMessage && <p className={`mt-6 rounded-2xl px-4 py-3 text-sm ${statusClass}`}>{statusMessage}</p>}
+
+        <section className="mt-8 rounded-2xl bg-slate-950/70 p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-white">Recovery report</h2>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+              Since {formatActivityTime(recoveryReport.recentCutoff)}
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {[
+              ["Open", recoveryReport.openCaseCount],
+              ["Pending ID", recoveryReport.pendingVerificationCount],
+              ["Verified open", recoveryReport.verifiedOpenCaseCount],
+              ["Actioned", recoveryReport.actionedCaseCount],
+              ["Stale active", recoveryReport.staleOpenCaseCount]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Reset emails", recoveryReport.passwordResetQueuedRecentCount],
+              ["Verification emails", recoveryReport.emailVerificationQueuedRecentCount],
+              ["Closed", recoveryReport.closedRecentCount],
+              ["Denied", recoveryReport.deniedRecentCount]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="mt-8 rounded-2xl bg-slate-950/70 p-5">
           <h2 className="text-lg font-semibold text-white">Create case</h2>

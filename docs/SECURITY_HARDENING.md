@@ -19,7 +19,7 @@ This checklist captures the current security posture and the next hardening move
 - Repeated failed access-code attempts can queue deduped admin alert emails through `OutboundMessage`.
 - Audit logs record core host, player, admin content, support, party status, invite resend, spoiler unlock, outbound retry, and auth/account-security events.
 - Super-admin user operations can request/approve sensitive role changes, revoke sessions, search/filter accounts, and review recent account-security audit events, with bootstrap access for the first super administrator.
-- Support-gated account recovery cases track identity review, matching support-ticket linkage, safe reset/verification email queueing, and recovery audit events without exposing signed links.
+- Support-gated account recovery cases track identity review, matching support-ticket linkage, safe reset/verification email queueing, active/stale/recent-action reporting, and recovery audit events without exposing signed links.
 - User sessions retain IP address, user-agent, created-by, last-seen, expiration, and revocation metadata for account review.
 - Login tracks consecutive failed attempts and temporarily locks accounts after repeated failures.
 - Repeated-login lockouts queue deduped account-security alert emails when admin alert recipients are configured.
@@ -135,10 +135,11 @@ This checklist captures the current security posture and the next hardening move
 
 ## Recommended Next Code Changes
 
-1. Add recovery drill reporting and deeper risk scoring for repeated lockouts/recovery requests.
-2. Expand dedicated test database coverage with more browser-level mutation tests.
-3. Add structured logging for webhook, support, auth, and admin events.
-4. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
-5. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
-6. Tune suspicious-attempt thresholds after real staging gameplay tests.
-7. Add richer approval policy rules before hiring support/content staff.
+1. Run the recovery drill against `/admin/account-recovery` and record any support-process gaps.
+2. Add deeper risk scoring for repeated lockouts/recovery requests.
+3. Expand dedicated test database coverage with more browser-level mutation tests.
+4. Add structured logging for webhook, support, auth, and admin events.
+5. Configure production email sender/domain and add outbound delivery event webhooks after choosing the live provider account.
+6. Expand publish-readiness validation for circular dependencies, spoiler wording, and non-code trigger types.
+7. Tune suspicious-attempt thresholds after real staging gameplay tests.
+8. Add richer approval policy rules before hiring support/content staff.
